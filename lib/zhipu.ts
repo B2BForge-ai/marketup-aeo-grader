@@ -1,6 +1,9 @@
 const ZHIPU_CHAT_URL =
   "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 
+const ZHIPU_EMBEDDING_URL =
+  "https://open.bigmodel.cn/api/paas/v4/embeddings";
+
 export function getZhipuApiKey(): string | undefined {
   return (
     process.env.ZHIPU_AI_API_KEY?.trim() ||
@@ -13,4 +16,4 @@ export function getZhipuModel(): string {
   return process.env.ZHIPU_MODEL?.trim() || "glm-4-flash";
 }
 
-export { ZHIPU_CHAT_URL };
+export { ZHIPU_CHAT_URL, ZHIPU_EMBEDDING_URL };

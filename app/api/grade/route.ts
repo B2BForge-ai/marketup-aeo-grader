@@ -1,23 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getZhipuApiKey, getZhipuModel, ZHIPU_CHAT_URL } from "@/lib/zhipu";
+import {
+  cosineSimilarity,
+  getEmbeddings,
+  similarityToPercent,
+} from "@/lib/embedding";
+import { fetchWebsiteMeta } from "@/lib/fetch-website-meta";
+import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
 
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are a world-class GEO (Generative Engine Optimization) strategist. 
-Your task is a two-step automated audit based on the Company Name, Industry, and Company Website URL provided by the user.
+const KEYWORD_EXTRACTION_PROMPT = `You are a GEO keyword strategist. Based on the company profile and website metadata, identify exactly 3 high-value, high-commercial-intent search phrases that potential customers would use when asking LLM search engines for solutions in this industry.
 
-Step 1: Based on the company profile and its website URL, identify exactly 3 high-value, high-commercial-intent search phrases (Keywords) that potential customers would use when asking LLM search engines (like Zhipu, Kimi, DeepSeek) for solutions in this industry.
-Step 2: Perform a rigorous GEO audit specifically against these 3 generated keywords to see how well this company's brand intercepts them.
+Respond with a single valid JSON object only. No markdown.
 
-You MUST respond with a single, valid JSON object. Do not wrap it in markdown code blocks. The word 'json' is explicitly required.
+{
+  "extractedKeywords": [
+    { "keyword": "关键词1", "reason": "为什么选这个词（中文）" },
+    { "keyword": "关键词2", "reason": "为什么选这个词（中文）" },
+    { "keyword": "关键词3", "reason": "为什么选这个词（中文）" }
+  ]
+}`;
+
+const SYSTEM_PROMPT = `You are a world-class GEO (Generative Engine Optimization) strategist.
+You will receive REAL vector-space semantic similarity scores (computed via Zhipu embedding-3 + cosine similarity) between the company website and 3 target keywords.
+
+CRITICAL: These similarity percentages are hard mathematical data, NOT estimates. You MUST reference them in your critique. Do NOT speak in generalities — tie every gap and action to specific low-similarity keywords.
+
+Perform a rigorous GEO audit against the 3 provided keywords.
+
+You MUST respond with a single, valid JSON object. Do not wrap it in markdown code blocks.
 
 Response Structure Example:
 {
   "score": 65,
   "extractedKeywords": [
-    { "keyword": "关键词1 (如：好用的B2B营销自动化系统)", "reason": "为什么选这个词：这是该行业转化率最高的通用意图词" },
-    { "keyword": "关键词2 (如：HubSpot国内替代软件)", "reason": "为什么选这个词：精准拦截寻找替代方案的高客单价客户" },
-    { "keyword": "关键词3 (如：如何做外贸B2B获客)", "reason": "为什么选这个词：针对上游知识库检索场景的内容拦截点" }
+    { "keyword": "好用的B2B营销自动化系统", "reason": "为什么选这个词" },
+    { "keyword": "HubSpot国内替代软件", "reason": "为什么选这个词" },
+    { "keyword": "如何做外贸B2B获客", "reason": "为什么选这个词" }
   ],
   "geoMetrics": {
     "structuringScore": 58,
@@ -26,18 +46,78 @@ Response Structure Example:
     "semanticDensity": "低"
   },
   "geoTechnicalActions": [
-    { "type": "结构化重构", "targetKeyword": "关键词1的实际文本", "detail": "针对【关键词1】，大模型在检索时优先抓取带有清晰产品功能对比表的网页，而您的官网全是宣传口水话，导致无法被 AI 提取作为答案。建议增加结构化参数表格。" },
-    { "type": "语义绑定", "targetKeyword": "关键词2的实际文本", "detail": "针对【关键词2】，您的品牌在全网语料中尚未与该竞品建立'替代关联'。建议在公网发布对比分析报告，让两者的实体名在同一段落高频共现。" }
+    {
+      "type": "结构化重构",
+      "targetKeyword": "好用的B2B营销自动化系统",
+      "detail": "向量相似度仅 X%，官网 Title/Description 与关键词语义空间严重偏离，缺乏可被 RAG 切片提取的 Q&A 结构。",
+      "codeSnippet": "<script type=\\"application/ld+json\\">{\\"@context\\":\\"https://schema.org\\",\\"@type\\":\\"FAQPage\\",\\"mainEntity\\":[{\\"@type\\":\\"Question\\",\\"name\\":\\"什么是好用的B2B营销自动化系统？\\",\\"acceptedAnswer\\":{\\"@type\\":\\"Answer\\",\\"text\\":\\"公司名提供全链路自动化方案...\\"}}]}</script>"
+    },
+    {
+      "type": "数字指标增强",
+      "targetKeyword": "HubSpot国内替代软件",
+      "detail": "向量相似度 X%，页面缺乏与关键词共现的量化数据。",
+      "codeSnippet": "## 核心数据背书\\n- 客户转化率提升 **35%**\\n- 部署周期缩短至 **7 天**\\n- 服务企业 **500+** 家"
+    }
   ],
-  "gaps": ["大模型无法将该官网 URL 关联到核心业务痛点", "缺乏针对 AI 爬虫切片（Chunking）优化的落地页"]
+  "gaps": ["针对相似度最低的关键词，指出具体语义偏离原因"]
 }
 
 Field requirements:
-- score: integer 0-100, overall GEO score for keyword interception capability
-- extractedKeywords: array of exactly 3 objects, each with "keyword" (realistic Chinese search phrase) and "reason" (why this keyword was selected, in Chinese)
-- geoMetrics: structuringScore and statisticsScore integers 0-100; citationRate percentage string; semanticDensity one of "高", "中", "低"
-- geoTechnicalActions: array of 2-4 objects, each with "type" (e.g. "结构化重构", "数字指标增强", "语义绑定", "实体语义解耦"), "targetKeyword" (must match one of the 3 extracted keywords exactly), and "detail" (actionable recommendation referencing the target keyword, in Chinese)
-- gaps: array of 2-4 specific information gap findings in Chinese`;
+- score: integer 0-100, informed by the provided similarity scores
+- extractedKeywords: use EXACTLY the 3 keywords provided in the user message (same keyword strings, you may refine reason)
+- geoMetrics: structuringScore, statisticsScore (0-100), citationRate (%), semanticDensity (高/中/低)
+- geoTechnicalActions: 2-4 objects with type, targetKeyword, detail, codeSnippet
+  * When type is "结构化重构": codeSnippet MUST be valid JSON-LD script tag tailored to company and targetKeyword
+  * When type is "数字指标增强": codeSnippet MUST be Markdown Q&A or statistics block with specific numbers
+  * For other types: codeSnippet may be empty string ""
+- gaps: 2-4 Chinese strings, each referencing specific similarity data`;
+
+interface ExtractedKeyword {
+  keyword: string;
+  reason: string;
+}
+
+async function callZhipuChat(
+  apiKey: string,
+  systemPrompt: string,
+  userContent: string,
+  jsonMode = true
+) {
+  const body: Record<string, unknown> = {
+    model: getZhipuModel(),
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ],
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const response = await fetch(ZHIPU_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Zhipu chat error: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    throw new Error("AI returned empty content");
+  }
+
+  return JSON.parse(content);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,6 +131,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const urlCheck = await validateWebsiteUrl(websiteUrl);
+    if (!urlCheck.ok) {
+      return NextResponse.json({ error: urlCheck.error }, { status: 400 });
+    }
+
     const apiKey = getZhipuApiKey();
     if (!apiKey) {
       return NextResponse.json(
@@ -62,45 +147,100 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await fetch(ZHIPU_CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: getZhipuModel(),
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Company: ${companyName.trim()}\nIndustry: ${industry.trim()}\nWebsite: ${websiteUrl.trim()}`,
-          },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const normalizedUrl = normalizeWebsiteUrl(websiteUrl);
+
+    let websiteMeta;
+    try {
+      websiteMeta = await fetchWebsiteMeta(normalizedUrl);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "无法读取官网页面内容，请确保网站可公开访问且包含 Title 或 Description 元信息。",
+        },
+        { status: 400 }
+      );
+    }
+
+    const websiteText =
+      websiteMeta.text.trim() ||
+      [companyName.trim(), industry.trim()].filter(Boolean).join(" · ");
+
+    if (!websiteText) {
+      return NextResponse.json(
+        { error: "无法从官网提取可用于语义分析的文本内容" },
+        { status: 400 }
+      );
+    }
+
+    const keywordPayload = await callZhipuChat(
+      apiKey,
+      KEYWORD_EXTRACTION_PROMPT,
+      `Company: ${companyName.trim()}
+Industry: ${industry.trim()}
+Website: ${normalizedUrl}
+Website Title: ${websiteMeta.title || "(未检测到)"}
+Website Description: ${websiteMeta.description || "(未检测到)"}`
+    );
+
+    const keywords: ExtractedKeyword[] = keywordPayload.extractedKeywords;
+    if (!keywords?.length || keywords.length < 3) {
+      return NextResponse.json(
+        { error: "关键词提取失败，请稍后重试" },
+        { status: 502 }
+      );
+    }
+
+    const topKeywords = keywords.slice(0, 3);
+    const embeddingInputs = [
+      websiteText,
+      ...topKeywords.map((k) => k.keyword),
+    ];
+
+    const vectors = await getEmbeddings(apiKey, embeddingInputs);
+    const websiteVector = vectors[0];
+
+    const semanticSimilarities = topKeywords.map((kw, i) => {
+      const keywordVector = vectors[i + 1];
+      const similarity = cosineSimilarity(websiteVector, keywordVector);
+      return {
+        keyword: kw.keyword,
+        reason: kw.reason,
+        semanticSimilarity: similarityToPercent(similarity),
+      };
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Zhipu API error:", errText);
-      return NextResponse.json(
-        { error: "GEO 诊断服务暂时不可用，请稍后重试" },
-        { status: 502 }
-      );
-    }
+    const similarityContext = semanticSimilarities
+      .map(
+        (item, i) =>
+          `- 关键词 ${i + 1}「${item.keyword}」：真实语义相似度 ${item.semanticSimilarity}%`
+      )
+      .join("\n");
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const diagnosisPayload = await callZhipuChat(
+      apiKey,
+      SYSTEM_PROMPT,
+      `Company: ${companyName.trim()}
+Industry: ${industry.trim()}
+Website: ${normalizedUrl}
+Website Title: ${websiteMeta.title || "(未检测到)"}
+Website Description: ${websiteMeta.description || "(未检测到)"}
 
-    if (!content) {
-      return NextResponse.json(
-        { error: "AI 返回数据格式异常" },
-        { status: 502 }
-      );
-    }
+【向量空间硬核数据 — embedding-3 余弦相似度，请务必引用】
+我已经通过智谱 Embedding-3 向量计算得出，该官网文本与以下关键词的真实语义相似度为：
+${similarityContext}
 
-    const result = JSON.parse(content);
+请你结合这个真实的硬核数据，在返回的 JSON 报告中进行有针对性的批判性 GEO 漏洞分析，不要再说空话。
+
+【必须使用以下 3 个关键词（keyword 字段不得修改）】
+${topKeywords.map((k, i) => `${i + 1}. ${k.keyword}`).join("\n")}`
+    );
+
+    const result = {
+      ...diagnosisPayload,
+      extractedKeywords: semanticSimilarities,
+    };
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("Grade API error:", error);

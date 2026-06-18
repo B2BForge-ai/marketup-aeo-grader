@@ -1,8 +1,9 @@
-import { Crosshair, Sparkles } from "lucide-react";
+import { Crosshair, Sparkles, AlertTriangle } from "lucide-react";
 
 export interface ExtractedKeyword {
   keyword: string;
   reason: string;
+  semanticSimilarity?: number;
 }
 
 const CARD_ACCENTS = [
@@ -16,6 +17,59 @@ const BADGE_COLORS = [
   "bg-violet-500/20 text-violet-300",
   "bg-amber-500/20 text-amber-300",
 ];
+
+function getSimilarityStyle(percent: number) {
+  if (percent < 40) {
+    return {
+      bar: "bg-red-500",
+      text: "text-red-400",
+      ring: "ring-red-500/40",
+      bg: "bg-red-500/10",
+    };
+  }
+  if (percent < 60) {
+    return {
+      bar: "bg-orange-500",
+      text: "text-orange-400",
+      ring: "ring-orange-500/40",
+      bg: "bg-orange-500/10",
+    };
+  }
+  return {
+    bar: "bg-emerald-500",
+    text: "text-emerald-400",
+    ring: "ring-emerald-500/40",
+    bg: "bg-emerald-500/10",
+  };
+}
+
+function SimilarityBadge({ percent }: { percent: number }) {
+  const style = getSimilarityStyle(percent);
+  const isLow = percent < 60;
+
+  return (
+    <div className={`mt-3 rounded-lg p-3 ${style.bg} ring-1 ${style.ring}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-slate-400">AI 语义空间吻合度</span>
+        <span className={`text-sm font-bold tabular-nums ${style.text}`}>
+          {percent}%
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${style.bar}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {isLow && (
+        <p className="mt-2 text-xs text-orange-300/90 leading-relaxed flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-400" />
+          这意味着大模型在进行 Vector Search 时，您的网站有极高概率因语义偏离而被直接过滤。
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function ExtractedKeywords({
   keywords,
@@ -55,6 +109,9 @@ export default function ExtractedKeywords({
             <p className="text-xs text-slate-400 leading-relaxed">
               {item.reason}
             </p>
+            {typeof item.semanticSimilarity === "number" && (
+              <SimilarityBadge percent={item.semanticSimilarity} />
+            )}
           </div>
         ))}
       </div>
