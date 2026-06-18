@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI 搜索可见度诊断器 | MarketUP AEO Grader",
-  description: "30秒免费获取由智谱 GLM 驱动的企业 GEO 生成式引擎优化诊断报告",
+  description: "30秒免费获取由 DeepSeek 驱动的企业 GEO 生成式引擎优化诊断报告",
 };
 
 export default function RootLayout({

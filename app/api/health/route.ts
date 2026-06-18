@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { getZhipuApiKey } from "@/lib/zhipu";
+import { getDeepSeekApiKey } from "@/lib/deepseek";
 
 export async function GET() {
-  const key = getZhipuApiKey();
+  const key = getDeepSeekApiKey();
   return NextResponse.json({
-    zhipuKeyConfigured: Boolean(key),
+    deepseekKeyConfigured: Boolean(key),
     keyLength: key?.length ?? 0,
     nodeEnv: process.env.NODE_ENV,
-    expectedVar: "ZHIPU_AI_API_KEY",
+    expectedVar: "DEEPSEEK_API_KEY",
     hint: key
       ? "环境变量已读取，API 应可正常工作"
-      : "ZHIPU_AI_API_KEY 未读取到，请检查 Vercel Settings → Environment Variables",
+      : "DEEPSEEK_API_KEY 未读取到，请检查 Vercel Settings → Environment Variables",
   });
 }

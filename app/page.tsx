@@ -33,9 +33,9 @@ interface GradeResult {
 const LOADING_LOGS = [
   "正在验证官网 URL 可访问性...",
   "正在抓取官网 Title / Description 元数据...",
-  "正在连接智谱 GLM-4-Flash 推理节点...",
+  "正在连接 DeepSeek 推理节点...",
   "正在提取行业高商业意图核心词...",
-  "正在调用智谱 Embedding-3 构建向量空间...",
+  "正在构建 TF-IDF 文本语义向量...",
   "正在计算官网与关键词的余弦相似度...",
   "正在将真实向量数据注入 GEO 批判性分析...",
   "正在生成技术整改方案与可复制代码资产...",
@@ -254,7 +254,7 @@ export default function Home() {
         <div className="flex justify-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 text-sm">
             <Sparkles className="w-4 h-4" />
-            GEO Search Grader · Powered by 智谱 GLM
+            GEO Search Grader · Powered by DeepSeek
           </div>
         </div>
 

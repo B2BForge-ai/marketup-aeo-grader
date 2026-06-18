@@ -1,9 +1,13 @@
 import { NextRequest } from "next/server";
-import { getZhipuApiKey, getZhipuModel, ZHIPU_CHAT_URL } from "@/lib/zhipu";
+import {
+  DEEPSEEK_CHAT_URL,
+  getDeepSeekApiKey,
+  getDeepSeekModel,
+} from "@/lib/deepseek";
 
 export const maxDuration = 60;
 
-const CHAT_SYSTEM = `你是一位世界级的 GEO（Generative Engine Optimization，生成式引擎优化）专家，专精于智谱 GLM、DeepSeek、Kimi 等 LLM RAG 系统的品牌可见度优化。
+const CHAT_SYSTEM = `你是一位世界级的 GEO（Generative Engine Optimization，生成式引擎优化）专家，专精于 DeepSeek、Kimi、智谱 GLM 等 LLM RAG 系统的品牌可见度优化。
 
 你将收到一份完整的企业 GEO 诊断报告作为上下文。请基于该报告：
 - 解答用户对 GEO 得分、竞品对比、geoMetrics 指标的疑问
@@ -35,9 +39,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const apiKey = getZhipuApiKey();
+    const apiKey = getDeepSeekApiKey();
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "ZHIPU_AI_API_KEY 未配置" }), {
+      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY 未配置" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
@@ -51,14 +55,14 @@ export async function POST(request: NextRequest) {
 ${JSON.stringify(report, null, 2)}
 `;
 
-    const upstream = await fetch(ZHIPU_CHAT_URL, {
+    const upstream = await fetch(DEEPSEEK_CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: getZhipuModel(),
+        model: getDeepSeekModel(),
         messages: [
           { role: "system", content: CHAT_SYSTEM + contextBlock },
           ...messages.map((m) => ({ role: m.role, content: m.content })),
