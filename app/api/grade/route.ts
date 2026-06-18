@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 const SYSTEM_PROMPT = `You are an expert in Answer Engine Optimization (AEO) and brand visibility auditing with access to multi-source web intelligence.
 
 CRITICAL RESEARCH MANDATE:
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.ZHIPU_API_KEY;
     if (!apiKey?.trim()) {
       return NextResponse.json(
-        { error: "请在 .env.local 中配置有效的 ZHIPU_API_KEY" },
+        { error: "服务端未配置 ZHIPU_API_KEY，请在 Vercel 环境变量或 .env.local 中设置" },
         { status: 500 }
       );
     }
