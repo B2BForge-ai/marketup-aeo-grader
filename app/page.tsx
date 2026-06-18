@@ -5,68 +5,40 @@ import {
   Search,
   Building2,
   Briefcase,
-  TrendingUp,
-  Heart,
   AlertCircle,
-  CheckCircle2,
   Sparkles,
   ArrowRight,
   Lock,
   Shield,
-  Target,
+  Globe,
 } from "lucide-react";
-import CompetitionRadar from "./components/CompetitionRadar";
+import ExtractedKeywords from "./components/ExtractedKeywords";
+import GeoMetricsGrid from "./components/GeoMetricsGrid";
+import GeoTechnicalActions from "./components/GeoTechnicalActions";
 import ChatPanel from "./components/ChatPanel";
+import type { ExtractedKeyword } from "./components/ExtractedKeywords";
+import type { GeoMetrics } from "./components/GeoMetricsGrid";
+import type { GeoTechnicalAction } from "./components/GeoTechnicalActions";
 
 type ViewState = "input" | "loading" | "result";
 
-interface ModelDetail {
-  score: number;
-  status: string;
-}
-
-interface ModelsDetail {
-  deepseek: ModelDetail;
-  kimi: ModelDetail;
-  doubao: ModelDetail;
-}
-
-interface CompetitorBrand {
-  name: string;
-  score: number;
-  sov: string;
-  tag: string;
-  advantage: string;
-}
-
 interface GradeResult {
   score: number;
-  sentiment: string;
-  presenceRate: string;
-  evaluation: string;
-  modelsDetail?: ModelsDetail;
-  competitors?: CompetitorBrand[];
+  extractedKeywords: ExtractedKeyword[];
+  geoMetrics: GeoMetrics;
+  geoTechnicalActions: GeoTechnicalAction[];
   gaps: string[];
-  actions: string[];
 }
 
 const LOADING_LOGS = [
-  "正在连接 DeepSeek API...",
-  "正在连接 Kimi 语义检索节点...",
-  "正在连接豆包 品牌知识库...",
-  "正在检索百度索引 2026 最新收录...",
-  "正在抓取知乎 行业讨论与问答数据...",
-  "正在扫描微信公众号 近期品牌内容...",
-  "正在聚合全网多源语义数据集...",
-  "正在注入品牌探测 Prompts...",
-  "正在计算竞品 AEO 雷达对比...",
+  "正在连接智谱 GLM-4-Flash 推理节点...",
+  "正在解析企业官网 URL 语义结构...",
+  "正在提取行业高商业意图核心词...",
+  "正在模拟 RAG 向量检索拦截测试...",
+  "正在审计官网结构化三元组覆盖率...",
+  "正在评估 3 大关键词品牌拦截率...",
+  "正在生成 GEO 技术整改方案...",
   "预计还需要 10 秒...",
-];
-
-const PLATFORM_META: { key: keyof ModelsDetail; label: string; color: string }[] = [
-  { key: "deepseek", label: "DeepSeek", color: "text-blue-400" },
-  { key: "kimi", label: "Kimi", color: "text-violet-400" },
-  { key: "doubao", label: "豆包", color: "text-orange-400" },
 ];
 
 function getScoreColor(score: number) {
@@ -87,14 +59,6 @@ function getScoreColor(score: number) {
     text: "text-emerald-400",
     bg: "from-emerald-500/20 to-emerald-600/10",
   };
-}
-
-function getStatusBadge(status: string) {
-  if (status.includes("高风险") || status.includes("需优化"))
-    return "bg-red-500/15 text-red-400 border-red-500/30";
-  if (status.includes("优异") || status.includes("优秀"))
-    return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-  return "bg-yellow-500/15 text-yellow-400 border-yellow-500/30";
 }
 
 function ScoreGauge({ score }: { score: number }) {
@@ -130,7 +94,7 @@ function ScoreGauge({ score }: { score: number }) {
         <span className={`text-6xl font-bold tabular-nums ${colors.text}`}>
           {score}
         </span>
-        <span className="text-sm text-slate-400 mt-1">AEO 可见度得分</span>
+        <span className="text-sm text-slate-400 mt-1">GEO 综合得分</span>
       </div>
     </div>
   );
@@ -156,14 +120,12 @@ function UnlockModal({
             <Lock className="w-8 h-8 text-blue-400" />
           </div>
         </div>
-
         <h3 className="text-xl font-bold text-center mb-2">
-          🔒 您的企业 AEO 深度审计报告已生成
+          🔒 您的企业 GEO 深度审计报告已生成
         </h3>
         <p className="text-slate-400 text-sm text-center leading-relaxed mb-6">
-          请输入您的手机号 / 企业邮箱，以解锁完整 Gap 漏洞分析与 AEO 纠偏行动清单。
+          请输入手机号 / 企业邮箱，解锁完整 GEO 指标矩阵、关键词整改方案与信息断层分析。
         </p>
-
         <input
           type="text"
           value={contact}
@@ -171,14 +133,12 @@ function UnlockModal({
           placeholder="手机号或企业邮箱"
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/40 transition mb-3"
         />
-
         {error && (
           <p className="text-red-400 text-sm mb-3 flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
           </p>
         )}
-
         <button
           onClick={onUnlock}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 font-semibold transition-all shadow-lg shadow-blue-600/25 hover:scale-[1.02] active:scale-[0.98]"
@@ -186,7 +146,6 @@ function UnlockModal({
           <Shield className="w-5 h-5" />
           解锁完整报告
         </button>
-
         <p className="text-slate-500 text-xs text-center mt-4">
           信息仅用于报告交付，MarketUP 严格保护您的隐私
         </p>
@@ -199,7 +158,7 @@ export default function Home() {
   const [view, setView] = useState<ViewState>("input");
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
-  const [competitor, setCompetitor] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [result, setResult] = useState<GradeResult | null>(null);
   const [error, setError] = useState("");
   const [loadingLogIndex, setLoadingLogIndex] = useState(0);
@@ -218,7 +177,7 @@ export default function Home() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!companyName.trim() || !industry.trim()) return;
+    if (!companyName.trim() || !industry.trim() || !websiteUrl.trim()) return;
 
     setError("");
     setUnlocked(false);
@@ -230,17 +189,11 @@ export default function Home() {
       const res = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName,
-          industry,
-          competitor: competitor.trim() || undefined,
-        }),
+        body: JSON.stringify({ companyName, industry, websiteUrl }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "诊断失败");
-      }
+      if (!res.ok) throw new Error(data.error || "诊断失败");
 
       setResult(data);
       setView("result");
@@ -263,7 +216,6 @@ export default function Home() {
       setContactError("请输入有效的手机号或企业邮箱");
       return;
     }
-
     setContactError("");
     setUnlocked(true);
   }
@@ -274,7 +226,7 @@ export default function Home() {
     setUnlocked(false);
     setContact("");
     setContactError("");
-    setCompetitor("");
+    setWebsiteUrl("");
     setError("");
   }
 
@@ -301,18 +253,17 @@ export default function Home() {
         <div className="flex justify-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 text-sm">
             <Sparkles className="w-4 h-4" />
-            AI Search Grader · Powered by 智谱 GLM
+            GEO Search Grader · Powered by 智谱 GLM
           </div>
         </div>
 
-        {/* INPUT */}
         {view === "input" && (
           <div className="opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center leading-tight mb-4 bg-gradient-to-r from-white via-blue-100 to-violet-200 bg-clip-text text-transparent">
-              AI 搜索时代，大模型能推荐你的品牌吗？
+              大模型时代，RAG 能检索到你的品牌吗？
             </h1>
             <p className="text-center text-slate-400 text-base sm:text-lg mb-10 max-w-xl mx-auto">
-              输入公司与行业，30 秒免费获取《企业 AEO 可见度诊断报告》
+              输入官网 URL，30 秒自动提取核心词并生成 GEO 诊断报告
             </p>
 
             <form
@@ -337,7 +288,7 @@ export default function Home() {
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
                   <Briefcase className="w-4 h-4 text-violet-400" />
-                  行业 / 主营产品
+                  主营行业
                 </label>
                 <input
                   type="text"
@@ -351,18 +302,16 @@ export default function Home() {
 
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                  <Target className="w-4 h-4 text-orange-400" />
-                  主要竞争对手品牌
-                  <span className="text-slate-500 font-normal text-xs">
-                    选填，若不填 AI 将自动匹配行业死敌
-                  </span>
+                  <Globe className="w-4 h-4 text-emerald-400" />
+                  企业官网 URL
                 </label>
                 <input
                   type="text"
-                  value={competitor}
-                  onChange={(e) => setCompetitor(e.target.value)}
-                  placeholder="例：HubSpot, Salesforce（可填 1-2 个，逗号分隔）"
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500/60 focus:ring-1 focus:ring-orange-500/40 transition"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="例：www.marketup.cn"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40 transition"
                 />
               </div>
 
@@ -384,32 +333,19 @@ export default function Home() {
           </div>
         )}
 
-        {/* LOADING */}
         {view === "loading" && (
           <div className="flex flex-col items-center justify-center p-12 text-center opacity-0 animate-[fadeIn_0.5s_ease-out_forwards]">
             <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping" />
               <div className="absolute inset-2 rounded-full border border-blue-500/40 animate-pulse" />
-              <div
-                className="absolute inset-4 rounded-full border border-blue-500/20"
-                style={{
-                  background:
-                    "conic-gradient(from 0deg, transparent 0deg, rgba(59,130,246,0.3) 60deg, transparent 120deg)",
-                  animation: "spin 3s linear infinite",
-                }}
-              />
               <div className="w-16 h-16 rounded-full border-t-2 border-r-2 border-blue-500 animate-spin" />
-              <div className="absolute w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             </div>
-
-            <h3 className="text-xl font-semibold mb-2">
-              全网 AI 曝光度深度审计中...
-            </h3>
+            <h3 className="text-xl font-semibold mb-2">官网语义解析中...</h3>
             <p className="text-slate-400 text-sm mb-6">
-              正在对 <span className="text-blue-300">{companyName}</span>{" "}
-              进行多平台雷达扫描
+              正在扫描{" "}
+              <span className="text-emerald-300">{websiteUrl}</span>{" "}
+              并提取 AI 流量关键词
             </p>
-
             <div className="w-full max-w-md bg-black border border-slate-800 rounded-lg p-4 text-left font-mono text-sm text-green-400 space-y-1.5 min-h-[160px]">
               {LOADING_LOGS.slice(0, loadingLogIndex + 1).map((log, i) => (
                 <div
@@ -429,7 +365,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* RESULT */}
         {view === "result" && result && (
           <>
             {!unlocked && (
@@ -442,7 +377,6 @@ export default function Home() {
             )}
 
             <div className="opacity-0 animate-[fadeInUp_0.7s_ease-out_forwards] space-y-6">
-              {/* 整体得分 — 始终清晰 */}
               <div
                 className={`flex flex-col items-center py-6 rounded-2xl bg-gradient-to-b ${getScoreColor(result.score).bg} border border-white/10`}
               >
@@ -450,85 +384,31 @@ export default function Home() {
                 {!unlocked && (
                   <p className="text-slate-400 text-sm mt-4 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5" />
-                    完整报告已生成，留资后即可解锁下方详情
+                    完整 GEO 报告已生成，留资后即可解锁详情
                   </p>
                 )}
               </div>
 
-              {unlocked &&
-                result.competitors &&
-                result.competitors.length > 0 && (
-                  <CompetitionRadar
-                    competitors={result.competitors}
-                    companyName={companyName}
-                  />
-                )}
+              {result.extractedKeywords?.length > 0 && (
+                <ExtractedKeywords keywords={result.extractedKeywords} />
+              )}
 
-              {/* 三平台分项 + 核心指标 — 留资前可见（制造紧迫感） */}
-              <div className="space-y-6">
-                {result.modelsDetail && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {PLATFORM_META.map(({ key, label, color }) => {
-                      const detail = result.modelsDetail![key];
-                      if (!detail) return null;
-                      return (
-                        <div
-                          key={key}
-                          className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 text-center"
-                        >
-                          <p className={`text-sm font-medium ${color} mb-1`}>
-                            {label}
-                          </p>
-                          <p
-                            className={`text-3xl font-bold tabular-nums ${getScoreColor(detail.score).text}`}
-                          >
-                            {detail.score}
-                          </p>
-                          <span
-                            className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs border ${getStatusBadge(detail.status)}`}
-                          >
-                            {detail.status}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-5">
-                    <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                      <TrendingUp className="w-4 h-4 text-blue-400" />
-                      AI 提及率
-                    </div>
-                    <p className="text-3xl font-bold text-blue-300">
-                      {result.presenceRate}
-                    </p>
-                  </div>
-                  <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-5">
-                    <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                      <Heart className="w-4 h-4 text-pink-400" />
-                      AI 情感态度
-                    </div>
-                    <p className="text-2xl font-bold text-pink-300">
-                      {result.sentiment}
-                    </p>
-                  </div>
+              {unlocked && result.geoMetrics && (
+                <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6">
+                  <GeoMetricsGrid metrics={result.geoMetrics} />
                 </div>
+              )}
 
-                {/* Evaluation / Gaps / Actions — 留资前模糊 */}
-                <div
-                  className={`space-y-6 transition-all duration-500 ${blurClass}`}
-                >
-                  <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold mb-3 text-slate-200">
-                      AI 眼中的你
-                    </h3>
-                    <p className="text-slate-300 leading-relaxed">
-                      {result.evaluation}
-                    </p>
+              <div className={`space-y-6 transition-all duration-500 ${blurClass}`}>
+                {result.geoTechnicalActions?.length > 0 && (
+                  <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6">
+                    <GeoTechnicalActions
+                      actions={result.geoTechnicalActions}
+                    />
                   </div>
+                )}
 
+                {result.gaps?.length > 0 && (
                   <div className="bg-white/5 backdrop-blur border border-orange-500/20 rounded-xl p-6">
                     <h3 className="text-lg font-semibold mb-4 text-orange-300 flex items-center gap-2">
                       <AlertCircle className="w-5 h-5" />
@@ -546,31 +426,15 @@ export default function Home() {
                       ))}
                     </ul>
                   </div>
+                )}
+              </div>
 
-                  <div className="bg-white/5 backdrop-blur border border-emerald-500/20 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-emerald-300 flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5" />
-                      AEO 核心优化建议 (Actions)
-                    </h3>
-                    <ul className="space-y-3">
-                      {result.actions.map((action, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-3 text-slate-300"
-                        >
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                          {action}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {unlocked && (
+              {unlocked && (
+                <>
                   <div className="bg-gradient-to-r from-blue-600/20 to-violet-600/20 border border-blue-500/30 rounded-2xl p-6 sm:p-8 text-center">
                     <p className="text-slate-200 text-base sm:text-lg mb-5 leading-relaxed">
-                      💡 诊断显示 AI 爬虫无法完美建立您的品牌认知。想要抢占第一波
-                      AI 搜索红利？
+                      💡 您的官网尚未拦截 AI 搜索核心流量词。想要抢占 GEO
+                      第一波红利？
                     </p>
                     <button
                       onClick={() =>
@@ -578,28 +442,24 @@ export default function Home() {
                       }
                       className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 font-semibold text-lg transition-all shadow-lg shadow-blue-600/30 hover:scale-[1.03] active:scale-[0.98]"
                     >
-                      立即联系 MarketUP 专家配置 AEO 语义网站
+                      立即联系 MarketUP 专家配置 GEO 语义网站
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   </div>
-                )}
 
-                {unlocked && (
                   <ChatPanel
                     companyName={companyName}
                     industry={industry}
                     report={result as unknown as Record<string, unknown>}
                   />
-                )}
-              </div>
 
-              {unlocked && (
-                <button
-                  onClick={handleReset}
-                  className="w-full py-3 text-slate-400 hover:text-white text-sm transition"
-                >
-                  ← 重新检测其他品牌
-                </button>
+                  <button
+                    onClick={handleReset}
+                    className="w-full py-3 text-slate-400 hover:text-white text-sm transition"
+                  >
+                    ← 重新检测其他品牌
+                  </button>
+                </>
               )}
             </div>
           </>

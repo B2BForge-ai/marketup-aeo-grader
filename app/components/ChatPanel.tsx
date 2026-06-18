@@ -135,8 +135,8 @@ export default function ChatPanel({
           <h3 className="text-lg font-semibold">AI 营销专家实时对谈</h3>
         </div>
         <p className="text-slate-400 text-sm leading-relaxed">
-          💡 对诊断结果有疑问？或者想让 AI 教你如何针对性干预
-          DeepSeek/Kimi 的回答？直接在这里追问：
+          💡 对 GEO 诊断结果有疑问？或者想让 AI 教你如何优化 RAG
+          检索排名？直接在这里追问：
         </p>
       </div>
 
