@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Send, Bot, User, Loader2 } from "lucide-react";
+import { MessageCircle, Send, Loader2 } from "lucide-react";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -41,7 +41,7 @@ async function consumeSSEStream(
         const delta = parsed.choices?.[0]?.delta?.content;
         if (delta) onDelta(delta);
       } catch {
-        // skip malformed chunks
+        /* skip malformed chunks */
       }
     }
   }
@@ -61,17 +61,14 @@ export default function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || streaming) return;
+  async function sendText(text: string) {
+    if (!text.trim() || streaming) return;
 
-    const userMsg: ChatMessage = { role: "user", content: text };
+    const userMsg: ChatMessage = { role: "user", content: text.trim() };
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
     setInput("");
     setStreaming(true);
-
     setMessages([...nextMessages, { role: "assistant", content: "" }]);
 
     try {
@@ -121,104 +118,96 @@ export default function ChatPanel({
     }
   }
 
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    sendText(input);
+  }
+
   const suggestions = [
-    "为什么 Kimi 给我的评分最低？",
-    "如何针对性优化 DeepSeek 的推荐排名？",
-    "竞品分数更高，我应该优先做什么？",
+    "为什么我的评分偏低？",
+    "哪个关键词最需要优先优化？",
+    "如何提升官网被 AI 引用的概率？",
   ];
 
   return (
-    <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-white/10 bg-gradient-to-r from-blue-600/10 to-violet-600/10">
-        <div className="flex items-center gap-2 mb-1">
-          <MessageCircle className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-semibold">AI 营销专家实时对谈</h3>
-        </div>
-        <p className="text-slate-400 text-sm leading-relaxed">
-          💡 对 GEO 诊断结果有疑问？或者想让 AI 教你如何优化 RAG
-          检索排名？直接在这里追问：
+    <section>
+      <div className="mb-4">
+        <h3 className="text-base font-semibold text-[#111] flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-[#E8321A]" />
+          继续追问 AI 顾问
+        </h3>
+        <p className="text-sm text-[#666] mt-1.5">
+          已读取您的完整诊断报告，可针对评分、关键词和优化方案进一步提问。
         </p>
       </div>
-
-      <div className="h-80 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <Bot className="w-10 h-10 text-slate-600 mb-3" />
-            <p className="text-slate-500 text-sm mb-4">
-              我已阅读您的完整 AEO 诊断报告，随时为您解答
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setInput(s)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-white/10 text-slate-400 hover:text-white hover:border-blue-500/40 transition"
-                >
-                  {s}
-                </button>
-              ))}
+      <div className="bg-[#F9F9F9] border border-[#EFEFEF] rounded-xl p-4">
+        <div className="max-h-44 overflow-y-auto mb-3">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center py-4">
+              <MessageCircle className="w-6 h-6 text-[#CCC] mb-2" />
+              <p className="text-sm text-[#666] text-center">
+                点击下方快捷问题，或直接输入您的疑问
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center mt-3">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => sendText(s)}
+                    className="border border-[#E8E8E8] rounded-full px-3 py-1.5 text-[13px] text-[#555] bg-white hover:border-[#E8321A] hover:text-[#E8321A] hover:bg-[#FFF5F4] transition"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-          >
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                msg.role === "user"
-                  ? "bg-violet-600/30"
-                  : "bg-blue-600/30"
-              }`}
-            >
-              {msg.role === "user" ? (
-                <User className="w-4 h-4 text-violet-300" />
-              ) : (
-                <Bot className="w-4 h-4 text-blue-300" />
-              )}
-            </div>
-            <div
-              className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-violet-600/20 border border-violet-500/20 text-slate-200"
-                  : "bg-white/5 border border-white/10 text-slate-300"
-              }`}
-            >
-              {msg.content || (
-                <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      <form
-        onSubmit={handleSend}
-        className="px-4 py-3 border-t border-white/10 flex gap-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="输入您的问题，例如：如何提升豆包中的品牌排名？"
-          disabled={streaming}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500/60 disabled:opacity-50 transition"
-        />
-        <button
-          type="submit"
-          disabled={streaming || !input.trim()}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5"
-        >
-          {streaming ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <Send className="w-4 h-4" />
+            <div className="space-y-2.5">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] px-3.5 py-2.5 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-[#E8321A] text-white rounded-[10px_10px_2px_10px]"
+                        : "bg-white border border-[#EFEFEF] text-[#444] rounded-[10px_10px_10px_2px]"
+                    }`}
+                  >
+                    {msg.content || (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#E8321A]" />
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={bottomRef} />
+            </div>
           )}
-        </button>
-      </form>
-    </div>
+        </div>
+        <form onSubmit={handleSend} className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="例如：首页标题应该怎么改？"
+            disabled={streaming}
+            className="flex-1 bg-white border border-[#E8E8E8] rounded-lg px-3.5 py-2.5 text-sm text-[#111] outline-none focus:border-[#E8321A] disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={streaming || !input.trim()}
+            className="bg-[#E8321A] hover:bg-[#C82A14] disabled:opacity-40 border-none rounded-lg w-10 h-10 flex items-center justify-center text-white transition shrink-0"
+            aria-label="发送"
+          >
+            {streaming ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </button>
+        </form>
+      </div>
+    </section>
   );
 }

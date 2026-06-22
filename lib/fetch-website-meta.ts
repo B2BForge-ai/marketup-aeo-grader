@@ -1,3 +1,5 @@
+import { BROWSER_HEADERS } from "@/lib/validate-url";
+
 function decodeHtmlEntities(raw: string): string {
   return raw
     .replace(/&amp;/g, "&")
@@ -45,7 +47,7 @@ export async function fetchWebsiteMeta(url: string): Promise<WebsiteMeta> {
       method: "GET",
       signal: controller.signal,
       redirect: "follow",
-      headers: { "User-Agent": "MarketUP-GEO-Grader/1.0" },
+      headers: BROWSER_HEADERS,
     });
 
     if (!res.ok) {

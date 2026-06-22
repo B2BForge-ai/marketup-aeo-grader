@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuditRequest {
+  id                     String   @id @default(uuid())
+  companyName            String
+  url                    String
+  phone                  String
+  initialScore           Int
+  email                  String?
+  hasRequestedDeepReport Boolean  @default(false)
+  status                 String   @default("NONE")
+  rawAiReport            String?
+  richReportHtml         String?
+  reportAccessToken      String?  @unique
+  adminNotes             String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}

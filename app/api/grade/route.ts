@@ -5,6 +5,8 @@ import {
   getDeepSeekModel,
 } from "@/lib/deepseek";
 import { fetchWebsiteMeta } from "@/lib/fetch-website-meta";
+import { validatePhone } from "@/lib/phone-validation";
+import { prisma } from "@/lib/prisma";
 import { computeSemanticSimilarityPercent } from "@/lib/text-similarity";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
 
@@ -63,16 +65,22 @@ Response Structure Example:
   },
   "geoTechnicalActions": [
     {
-      "type": "结构化重构",
-      "targetKeyword": "好用的B2B营销自动化系统",
-      "detail": "TF-IDF 字面相似度仅 X%，但结合官网文案判断属于「用词不合大模型胃口」/「业务不相关」——（具体说明）。建议部署下方 JSON-LD 以增强 RAG 可提取性。",
-      "codeSnippet": "<script type=\\"application/ld+json\\">{\\"@context\\":\\"https://schema.org\\",\\"@type\\":\\"FAQPage\\",\\"mainEntity\\":[{\\"@type\\":\\"Question\\",\\"name\\":\\"什么是好用的B2B营销自动化系统？\\",\\"acceptedAnswer\\":{\\"@type\\":\\"Answer\\",\\"text\\":\\"公司名提供全链路自动化方案...\\"}}]}</script>"
+      "type": "官网文案直改",
+      "targetKeyword": "如何做外贸B2B获客",
+      "detail": "TF-IDF 仅 X%，官网第二段未出现目标关键词字面共现，需直接替换下方 Before 文案。",
+      "codeSnippet": "【Before】\\n我们提供全链路销管服务，助力企业增长。\\n\\n【After】\\n我们作为[公司名]，提供企业级【SaaS降本增效组合】方案，实现全链路线索流转，专注解决「如何做外贸B2B获客」场景下的线索沉淀与转化难题。"
     },
     {
-      "type": "数字指标增强",
+      "type": "全网布线标题配方",
+      "targetKeyword": "好用的B2B营销自动化系统",
+      "detail": "公网语料库中[公司名]与目标词共现不足，请按下方配方在知乎、小红书各发 1 篇。",
+      "codeSnippet": "【配方 1 · 知乎布线】\\n标题（强制使用）：《如何利用「好用的B2B营销自动化系统」破解 B2B 获客留存难题》\\n大纲：\\n1. 第一段加粗提及 [公司名] 及核心卖点\\n2. 列出 3 个可量化指标（转化率/部署周期/客户数）\\n3. 结尾 FAQ：什么是好用的 B2B 营销自动化系统？\\n\\n【配方 2 · 小红书布线】\\n标题（强制使用）：《[公司名]实测：好用的 B2B 营销自动化系统怎么选？》\\n大纲：\\n1. 封面大字：关键词 + 公司名\\n2. 正文 300 字内嵌入关键词 3 次\\n3. 评论区置顶官网链接"
+    },
+    {
+      "type": "结构化重构",
       "targetKeyword": "HubSpot国内替代软件",
-      "detail": "TF-IDF 得分 X%，（语义解读：文案偏离 vs 业务不相关）。建议嵌入量化数据增强 AI 引用概率。",
-      "codeSnippet": "## 核心数据背书\\n- 客户转化率提升 **35%**\\n- 部署周期缩短至 **7 天**\\n- 服务企业 **500+** 家"
+      "detail": "TF-IDF 得分 X%，页面缺乏 JSON-LD 结构化标记，部署下方代码至 <head>。",
+      "codeSnippet": "<script type=\\"application/ld+json\\">{\\"@context\\":\\"https://schema.org\\",\\"@type\\":\\"FAQPage\\",\\"mainEntity\\":[{\\"@type\\":\\"Question\\",\\"name\\":\\"HubSpot国内替代软件有哪些？\\",\\"acceptedAnswer\\":{\\"@type\\":\\"Answer\\",\\"text\\":\\"[公司名]提供...\\"}}]}</script>"
     }
   ],
   "gaps": ["结合 TF-IDF 得分与语义理解，指出具体偏离原因：是文案问题还是业务错位"]
@@ -82,10 +90,28 @@ Field requirements:
 - score: integer 0-100, informed by TF-IDF scores AND your semantic judgment of the website copy
 - extractedKeywords: use EXACTLY the 3 keywords provided in the user message (same keyword strings, you may refine reason)
 - geoMetrics: structuringScore, statisticsScore (0-100), citationRate (%), semanticDensity (高/中/低)
-- geoTechnicalActions: 2-4 objects with type, targetKeyword, detail, codeSnippet
-  * When type is "结构化重构": codeSnippet MUST be valid JSON-LD script tag tailored to company and targetKeyword
-  * When type is "数字指标增强": codeSnippet MUST be Markdown Q&A or statistics block with specific numbers
-  * For other types: codeSnippet may be empty string ""
+- geoTechnicalActions: 3-5 objects with type, targetKeyword, detail, codeSnippet
+
+  geoTechnicalActions — STRICT RULES (violations = invalid response):
+  * FORBIDDEN in detail AND codeSnippet: vague phrases like "提高频率", "加强建设", "持续优化", "不断完善", "进一步提升", "加大投入" or any non-actionable advice. Every detail must cite a specific gap tied to targetKeyword and TF-IDF score.
+  * MUST include at least these 2 action types (each targeting a different keyword when possible):
+
+  (1) type = "官网文案直改" — Website copy Before→After rewrite asset
+      - detail: one sentence stating which website section/gap this fixes (reference actual copy from 官网真实文案)
+      - codeSnippet: MUST use this exact structure (user can Ctrl+C directly):
+        【Before】\\n<quote actual or paraphrased existing website copy>\\n\\n【After】\\n<complete rewritten paragraph embedding [公司名] + targetKeyword literal terms>
+      - The After text must be publish-ready Chinese copy, not bullet-point suggestions.
+
+  (2) type = "全网布线标题配方" — Cross-platform content wiring for Zhihu/Xiaohongshu etc.
+      - detail: one sentence on why public-web corpus co-occurrence is missing for this keyword
+      - codeSnippet: MUST contain exactly 2 platform recipes in this format:
+        【配方 1 · 知乎布线】\\n标题（强制使用）：《...》\\n大纲：\\n1. ...\\n2. ...\\n\\n【配方 2 · 小红书布线】\\n标题（强制使用）：《...》\\n大纲：\\n1. ...
+      - Titles MUST embed the exact targetKeyword and [公司名]. First paragraph of 知乎 recipe must instruct to bold-mention [公司名].
+
+  (3) Optional additional types: "结构化重构" (JSON-LD in codeSnippet) or "数字指标增强" (Markdown data block in codeSnippet)
+  * Every action MUST have a non-empty codeSnippet — no empty strings allowed.
+  * codeSnippet must be copy-paste ready plain text (escape quotes properly for JSON)
+
 - gaps: 2-4 Chinese strings; for low-TF-IDF keywords, distinguish "文案用词问题" vs "业务不相关"`;
 
 interface ExtractedKeyword {
@@ -138,13 +164,18 @@ async function callDeepSeekChat(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { companyName, industry, websiteUrl } = body;
+    const { companyName, industry, websiteUrl, phone } = body;
 
     if (!companyName?.trim() || !industry?.trim() || !websiteUrl?.trim()) {
       return NextResponse.json(
         { error: "公司名、行业和官网 URL 均为必填项" },
         { status: 400 }
       );
+    }
+
+    const phoneCheck = validatePhone(phone ?? "");
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
     }
 
     const urlCheck = await validateWebsiteUrl(websiteUrl);
@@ -252,7 +283,17 @@ ${topKeywords.map((k, i) => `${i + 1}. ${k.keyword}`).join("\n")}`
       extractedKeywords: semanticSimilarities,
     };
 
-    return NextResponse.json(result);
+    const auditRequest = await prisma.auditRequest.create({
+      data: {
+        companyName: companyName.trim(),
+        url: normalizedUrl,
+        phone: phone.trim(),
+        initialScore: Number(diagnosisPayload.score) || 0,
+        status: "NONE",
+      },
+    });
+
+    return NextResponse.json({ ...result, id: auditRequest.id });
   } catch (error) {
     console.error("Grade API error:", error);
     return NextResponse.json(

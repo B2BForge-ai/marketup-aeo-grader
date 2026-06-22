@@ -1,4 +1,5 @@
-import { Crosshair, Sparkles, AlertTriangle } from "lucide-react";
+import { Search, Flame, Target, TrendingUp } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export interface ExtractedKeyword {
   keyword: string;
@@ -6,69 +7,18 @@ export interface ExtractedKeyword {
   semanticSimilarity?: number;
 }
 
-const CARD_ACCENTS = [
-  "from-blue-500/15 to-blue-600/5 border-blue-500/30 text-blue-300",
-  "from-violet-500/15 to-violet-600/5 border-violet-500/30 text-violet-300",
-  "from-amber-500/15 to-amber-600/5 border-amber-500/30 text-amber-300",
-];
+const PRIORITY_ICONS: LucideIcon[] = [Flame, Target, TrendingUp];
 
-const BADGE_COLORS = [
-  "bg-blue-500/20 text-blue-300",
-  "bg-violet-500/20 text-violet-300",
-  "bg-amber-500/20 text-amber-300",
-];
-
-function getSimilarityStyle(percent: number) {
-  if (percent < 40) {
-    return {
-      bar: "bg-red-500",
-      text: "text-red-400",
-      ring: "ring-red-500/40",
-      bg: "bg-red-500/10",
-    };
-  }
-  if (percent < 60) {
-    return {
-      bar: "bg-orange-500",
-      text: "text-orange-400",
-      ring: "ring-orange-500/40",
-      bg: "bg-orange-500/10",
-    };
-  }
-  return {
-    bar: "bg-emerald-500",
-    text: "text-emerald-400",
-    ring: "ring-emerald-500/40",
-    bg: "bg-emerald-500/10",
-  };
+function barColor(percent: number) {
+  if (percent >= 60) return "#E8321A";
+  if (percent >= 40) return "#F59E0B";
+  return "#888888";
 }
 
-function SimilarityBadge({ percent }: { percent: number }) {
-  const style = getSimilarityStyle(percent);
-  const isLow = percent < 60;
-
-  return (
-    <div className={`mt-3 rounded-lg p-3 ${style.bg} ring-1 ${style.ring}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-slate-400">AI 语义空间吻合度</span>
-        <span className={`text-sm font-bold tabular-nums ${style.text}`}>
-          {percent}%
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${style.bar}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      {isLow && (
-        <p className="mt-2 text-xs text-orange-300/90 leading-relaxed flex items-start gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-400" />
-          这意味着大模型在进行 Vector Search 时，您的网站有极高概率因语义偏离而被直接过滤。
-        </p>
-      )}
-    </div>
-  );
+function matchHint(percent: number) {
+  if (percent >= 60) return "官网文案与关键词高度重合，较易被 AI 搜索关联。";
+  if (percent >= 40) return "有一定重合，但建议优化标题与描述中的用词。";
+  return "重合度偏低，AI 搜索时可能优先推荐竞品而非您的官网。";
 }
 
 export default function ExtractedKeywords({
@@ -78,43 +28,73 @@ export default function ExtractedKeywords({
 }) {
   if (!keywords?.length) return null;
 
+  const maxPct = Math.max(
+    ...keywords.map((k) => k.semanticSimilarity ?? 0)
+  );
+
   return (
-    <div className="bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-violet-500 to-amber-500" />
-
-      <div className="flex items-center gap-2 mb-5">
-        <Crosshair className="w-5 h-5 text-blue-400" />
-        <h3 className="text-lg font-semibold text-slate-100">
-          🎯 智能扫描：为您锁定的 3 大 AI 流量主战场
+    <section>
+      <div className="mb-4">
+        <h3 className="text-base font-semibold text-[#111] flex items-center gap-2">
+          <Search className="w-4 h-4 text-[#E8321A]" />
+          核心搜索关键词
         </h3>
+        <p className="text-sm text-[#666] mt-1.5 leading-relaxed">
+          以下是潜在客户向 DeepSeek、Kimi 等大模型提问时，最可能搜索的 3
+          个行业关键词。匹配度反映您的官网标题/描述与这些词的字面重合程度。
+        </p>
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {keywords.map((item, i) => {
+          const pct = item.semanticSimilarity ?? 0;
+          const isTop = pct === maxPct && pct > 0;
+          const Icon = PRIORITY_ICONS[i % 3];
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {keywords.map((item, i) => (
-          <div
-            key={i}
-            className={`rounded-xl border bg-gradient-to-br p-4 ${CARD_ACCENTS[i % 3]}`}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span
-                className={`text-xs font-bold px-2 py-0.5 rounded-full ${BADGE_COLORS[i % 3]}`}
-              >
-                战场 {i + 1}
-              </span>
-              <Sparkles className="w-3.5 h-3.5 opacity-60" />
+          return (
+            <div
+              key={i}
+              className={`bg-white border rounded-xl p-4 ${
+                isTop ? "border-[#E8321A]" : "border-[#EFEFEF]"
+              }`}
+            >
+              <div className="text-xs font-semibold text-[#E8321A] mb-2 flex items-center gap-1.5">
+                <Icon className="w-3.5 h-3.5" />
+                关键词 {i + 1}
+                {isTop && (
+                  <span className="text-[#888] font-normal">· 匹配最高</span>
+                )}
+              </div>
+              <p className="text-[15px] font-semibold text-[#111] leading-snug mb-3">
+                {item.keyword}
+              </p>
+              {typeof item.semanticSimilarity === "number" && (
+                <>
+                  <div className="h-1 bg-[#F0F0F0] rounded-full mb-2 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${pct}%`,
+                        background: barColor(pct),
+                      }}
+                    />
+                  </div>
+                  <p className="text-sm text-[#444] mb-1.5">
+                    官网文案匹配度{" "}
+                    <span className="font-bold text-[#111]">{pct}%</span>
+                  </p>
+                  <p className="text-[13px] text-[#666] leading-relaxed mb-2">
+                    {matchHint(pct)}
+                  </p>
+                </>
+              )}
+              <p className="text-[13px] text-[#666] leading-relaxed border-l-2 border-[#FFCCC8] pl-2.5">
+                <span className="font-medium text-[#888]">选择理由：</span>
+                {item.reason}
+              </p>
             </div>
-            <p className="text-sm font-semibold text-white leading-snug mb-2">
-              {item.keyword}
-            </p>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {item.reason}
-            </p>
-            {typeof item.semanticSimilarity === "number" && (
-              <SimilarityBadge percent={item.semanticSimilarity} />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }

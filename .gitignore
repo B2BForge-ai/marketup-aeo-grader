@@ -40,3 +40,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma sqlite
+/prisma/dev.db
+/prisma/dev.db-journal
+/prisma/*.db
+/prisma/*.db-journal
+
+# generated report PDFs
+/exports/
+/public/reports/*.pdf
+/public/reports/*.html
+!/public/reports/.gitkeep
