@@ -8,6 +8,7 @@ import { fetchWebsiteMeta } from "@/lib/fetch-website-meta";
 import { validatePhone } from "@/lib/phone-validation";
 import { prisma } from "@/lib/prisma";
 import { computeSemanticSimilarityPercent } from "@/lib/text-similarity";
+import { isPrismaConnectionError } from "@/lib/db-health";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
 
 export const maxDuration = 60;
@@ -296,6 +297,34 @@ ${topKeywords.map((k, i) => `${i + 1}. ${k.keyword}`).join("\n")}`
     return NextResponse.json({ ...result, id: auditRequest.id });
   } catch (error) {
     console.error("Grade API error:", error);
+
+    if (isPrismaConnectionError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "诊断结果已生成，但线索保存失败：无法连接数据库。请检查 Supabase 是否正常运行，并在 Vercel 中配置 Pooler 连接串（6543 端口）的 DATABASE_URL。",
+        },
+        { status: 503 }
+      );
+    }
+
+    const message =
+      error instanceof Error ? error.message : "诊断过程中发生错误，请稍后重试";
+
+    if (message.includes("DeepSeek")) {
+      return NextResponse.json(
+        { error: "AI 服务暂时不可用，请稍后重试" },
+        { status: 502 }
+      );
+    }
+
+    if (message.includes("JSON")) {
+      return NextResponse.json(
+        { error: "AI 返回格式异常，请稍后重试" },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
       { error: "诊断过程中发生错误，请稍后重试" },
       { status: 500 }
