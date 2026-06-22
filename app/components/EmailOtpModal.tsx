@@ -142,8 +142,12 @@ export default function EmailOtpModal({
         <h3 className="text-lg font-semibold text-[#111] mb-1 pr-8">
           企业邮箱验证
         </h3>
-        <p className="text-sm text-[#666] mb-5 leading-relaxed">
+        <p className="text-sm text-[#666] mb-2 leading-relaxed">
           深度白皮书将发送至您的企业工作邮箱，请先完成验证。
+        </p>
+        <p className="text-xs text-[#999] mb-5 leading-relaxed">
+          每个企业邮箱仅可申请 1 次深度报告；如需再次获取，请关注 MarketUP
+          后续活动。
         </p>
 
         <form onSubmit={handleVerify} className="space-y-4">

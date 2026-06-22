@@ -7,6 +7,11 @@ import {
 import { fetchWebsiteMeta } from "@/lib/fetch-website-meta";
 import { validatePhone } from "@/lib/phone-validation";
 import { prisma } from "@/lib/prisma";
+import {
+  isPhoneUsedForGrade,
+  normalizePhoneForLookup,
+  PHONE_USAGE_LIMIT_MESSAGE,
+} from "@/lib/usage-limit";
 import { computeSemanticSimilarityPercent } from "@/lib/text-similarity";
 import { isPrismaConnectionError } from "@/lib/db-health";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
@@ -179,6 +184,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
     }
 
+    const normalizedPhone = normalizePhoneForLookup(phone);
+
+    if (await isPhoneUsedForGrade(normalizedPhone)) {
+      return NextResponse.json({ error: PHONE_USAGE_LIMIT_MESSAGE }, { status: 409 });
+    }
+
     const urlCheck = await validateWebsiteUrl(websiteUrl);
     if (!urlCheck.ok) {
       return NextResponse.json({ error: urlCheck.error }, { status: 400 });
@@ -288,7 +299,7 @@ ${topKeywords.map((k, i) => `${i + 1}. ${k.keyword}`).join("\n")}`
       data: {
         companyName: companyName.trim(),
         url: normalizedUrl,
-        phone: phone.trim(),
+        phone: normalizedPhone,
         initialScore: Number(diagnosisPayload.score) || 0,
         status: "NONE",
       },

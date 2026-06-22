@@ -153,14 +153,27 @@ export default function Home() {
         {view === "input" && (
           <div className="flex flex-col items-center justify-center px-6 sm:px-10 py-14 animate-[fadeIn_0.4s_ease-out]">
             <PillBadge />
-            <h1 className="text-[30px] sm:text-[36px] font-semibold text-[#111] text-center leading-[1.3] mt-9 mb-3">
+            <p className="text-xs text-[#999] text-center mt-6 mb-1">
+              本检测服务由{" "}
+              <span className="font-medium text-[#E8321A]">MarketUP</span>{" "}
+              提供技术支持
+            </p>
+            <h1 className="text-[30px] sm:text-[36px] font-semibold text-[#111] text-center leading-[1.3] mt-4 mb-3">
               当用户问 AI，
               <br />
               你的<span className="text-[#E8321A]">品牌</span>会被推荐吗？
             </h1>
-            <p className="text-[15px] text-[#666] text-center mb-10 leading-relaxed max-w-[440px]">
+            <p className="text-[15px] text-[#666] text-center mb-6 leading-relaxed max-w-[440px]">
               填写企业信息，约 30 秒自动生成诊断报告：分析官网与搜索词的匹配程度，并给出可直接复制的优化方案。
             </p>
+
+            <div className="w-full max-w-[440px] mb-5 px-3.5 py-3 bg-[#FFF9F8] border border-[#FFDDD8] rounded-lg text-xs text-[#666] leading-relaxed">
+              每位用户限 <strong className="text-[#444] font-medium">1 次</strong>{" "}
+              免费初筛（同一手机号）与{" "}
+              <strong className="text-[#444] font-medium">1 次</strong>{" "}
+              深度报告（同一企业邮箱）。如需再次检测，敬请关注 MarketUP
+              后续活动与官方渠道，获取更多机会。
+            </div>
 
             <form
               onSubmit={handleSubmit}

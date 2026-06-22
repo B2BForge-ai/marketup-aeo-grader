@@ -4,6 +4,11 @@ import { generateDeepReportMarkdown } from "@/lib/deep-report";
 import { validateEnterpriseEmail } from "@/lib/email-validation";
 import { verifyOtp } from "@/lib/otp-store";
 import { prisma } from "@/lib/prisma";
+import {
+  isEmailUsedForDeepReport,
+  EMAIL_USAGE_LIMIT_MESSAGE,
+  normalizeEmailForLookup,
+} from "@/lib/usage-limit";
 
 export const maxDuration = 300;
 
@@ -67,6 +72,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: emailCheck.error }, { status: 400 });
     }
 
+    if (await isEmailUsedForDeepReport(email, id.trim())) {
+      return NextResponse.json({ error: EMAIL_USAGE_LIMIT_MESSAGE }, { status: 409 });
+    }
+
     const otpResult = verifyOtp(email, otpCode);
     if (!otpResult.ok) {
       return NextResponse.json({ error: otpResult.error }, { status: 400 });
@@ -88,7 +97,7 @@ export async function POST(request: NextRequest) {
     await prisma.auditRequest.update({
       where: { id },
       data: {
-        email: email.trim(),
+        email: normalizeEmailForLookup(email),
         hasRequestedDeepReport: true,
         status: "PENDING_REVIEW",
       },

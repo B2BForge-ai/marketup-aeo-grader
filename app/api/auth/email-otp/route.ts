@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateEnterpriseEmail } from "@/lib/email-validation";
 import {
+  isEmailUsedForDeepReport,
+  EMAIL_USAGE_LIMIT_MESSAGE,
+} from "@/lib/usage-limit";
+import {
   canSendOtp,
   generateOtpCode,
   MOCK_OTP_CODE,
@@ -22,6 +26,10 @@ export async function POST(request: NextRequest) {
     const emailCheck = validateEnterpriseEmail(email);
     if (!emailCheck.ok) {
       return NextResponse.json({ error: emailCheck.error }, { status: 400 });
+    }
+
+    if (await isEmailUsedForDeepReport(email)) {
+      return NextResponse.json({ error: EMAIL_USAGE_LIMIT_MESSAGE }, { status: 409 });
     }
 
     if (!getResendApiKey()) {
