@@ -30,12 +30,11 @@ export async function generateDeepReportMarkdown(
     throw new Error("DEEPSEEK_API_KEY 未配置");
   }
 
-  const { system, user } = generateDeepGeoReportPrompt({
+  const { systemPrompt, userPrompt } = generateDeepGeoReportPrompt({
     companyName: input.companyName,
     industry: input.industry,
     url: input.websiteUrl,
     score: input.score,
-    gradeSnapshot: input.gradeSnapshot,
   });
 
   const response = await fetch(DEEPSEEK_CHAT_URL, {
@@ -47,8 +46,8 @@ export async function generateDeepReportMarkdown(
     body: JSON.stringify({
       model: getDeepSeekModel(),
       messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
     }),

@@ -1,20 +1,99 @@
 /**
- * 殿堂级咨询报告视觉 - PDF HTML 模版生成器
- * 摆脱了邮件客户端限制，全面使用 Tailwind CSS、现代 Web 字体、精美阴影与打印控制。
- * 针对 Puppeteer 或浏览器直接打印 (Cmd + P) 进行了物理分页优化 (Page-Break Protection)。
+ * 殿堂级咨询报告视觉 - PDF HTML 模版生成器 (高保真打印升级版)
+ * 已内置强大的 Markdown Table 编译器，完美解决 PDF/Print 状态下的表格折行与布局截断问题。
  */
 
-// 辅助函数：将 Markdown 标记安全、高保真地转换为现代化带 Tailwind 的 HTML
+// 辅助函数：专门用于解析 Markdown 表格并输出高保真、美观的 HTML 数据表格
+function renderTableHtml(lines: string[]): string {
+  if (lines.length < 2) return lines.join('\n'); // 过滤无效表格
+
+  // 安全提取单元格内容（剔除首尾的 pipe 竖线并做去空格处理）
+  const getCells = (row: string) => {
+    return row.split('|')
+      .slice(1, -1)
+      .map(cell => cell.trim());
+  };
+
+  const headers = getCells(lines[0]);
+  
+  // 过滤并补齐行数据，防止多列或少列导致的排版崩溃
+  const bodyRows = lines.slice(2).map(row => {
+    const cells = getCells(row);
+    while (cells.length < headers.length) {
+      cells.push('');
+    }
+    return cells.slice(0, headers.length);
+  });
+
+  // 生成专为 PDF 打印优化的、带卡片投影与细线区隔的极简表格
+  let html = `
+  <div class="my-6 overflow-hidden border border-slate-200 rounded-xl shadow-md bg-white page-break-inside-avoid">
+    <table class="min-w-full divide-y divide-slate-200 text-left border-collapse text-xs sm:text-sm">
+      <thead class="bg-slate-50 border-b border-slate-200">
+        <tr>
+  `;
+  
+  headers.forEach(header => {
+    html += `<th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">${header}</th>`;
+  });
+
+  html += `
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+  `;
+
+  bodyRows.forEach((row, idx) => {
+    // 奇偶行交叉变色，强化视觉引导
+    html += `<tr class="${idx % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'} hover:bg-slate-50/50 transition-colors">`;
+    row.forEach(cell => {
+      // 在单元格内部二次渲染加粗与行内代码块，避免排版单调
+      let cellContent = cell
+        .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-slate-900 bg-yellow-50 px-1 rounded">$1</strong>')
+        .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-rose-600 rounded font-mono text-xs border border-slate-200 font-semibold">$1</code>');
+      
+      html += `<td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">${cellContent}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  </div>
+  `;
+  return html;
+}
+
+// 核心编译流：逐行解析 Markdown 标记
 function parseMarkdownToPdfHtml(markdown: string): string {
-  let html = markdown;
+  const lines = markdown.split('\n');
+  let inTable = false;
+  let tableLines: string[] = [];
+  let processedLines: string[] = [];
 
-  // 1. 转义基础 HTML 字符防止代码干扰，但保留特定容器
-  html = html
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  // 第一步：先将表格单独提取出来，避免被后续段落分割标签干扰
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('|') && line.endsWith('|')) {
+      inTable = true;
+      tableLines.push(line);
+    } else {
+      if (inTable) {
+        processedLines.push(renderTableHtml(tableLines));
+        tableLines = [];
+        inTable = false;
+      }
+      processedLines.push(lines[i]);
+    }
+  }
+  if (inTable) {
+    processedLines.push(renderTableHtml(tableLines));
+  }
 
-  // 2. 解析 JSON-LD 代码块（高亮美化，物理分页防截断）
+  let html = processedLines.join('\n');
+
+  // 1. 解析 JSON-LD 代码块
   html = html.replace(/```json([\s\S]*?)```/g, (_, code) => {
     return `
     <div class="my-6 rounded-xl border border-slate-800 bg-slate-950 shadow-lg overflow-hidden page-break-inside-avoid">
@@ -26,7 +105,7 @@ function parseMarkdownToPdfHtml(markdown: string): string {
     </div>`;
   });
 
-  // 3. 解析提示词附录代码块（绿虚线卡片，CMO/CEO一键复制资产）
+  // 2. 解析专属官网文案重构 Prompt 代码块
   html = html.replace(/```text([\s\S]*?)```/g, (_, code) => {
     return `
     <div class="my-6 rounded-xl border-2 border-dashed border-emerald-500 bg-emerald-50/40 p-6 shadow-sm page-break-inside-avoid">
@@ -41,16 +120,16 @@ function parseMarkdownToPdfHtml(markdown: string): string {
     </div>`;
   });
 
-  // 4. 解析标准代码块
+  // 3. 解析标准代码块
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
     return `
     <pre class="my-6 p-5 bg-slate-900 text-slate-200 border border-slate-800 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all page-break-inside-avoid">${code.trim()}</pre>`;
   });
 
-  // 5. 解析行内代码
+  // 4. 解析行内代码
   html = html.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-rose-600 rounded font-mono text-xs border border-slate-200 font-semibold">$1</code>');
 
-  // 6. 解析 H1, H2, H3 标题（并强行在 H2 标题前注入分页符，保证 PDF 排版不会半截断裂）
+  // 5. 解析 H1, H2, H3 标题（并在 H2 标题前注入分页符，保证 PDF 排版不会半截断裂）
   html = html.replace(/^# (.*?)$/gm, '<h1 class="text-3xl font-black text-slate-900 mt-10 mb-6 border-b-4 border-blue-600 pb-3 leading-tight tracking-tight">$1</h1>');
   
   // 核心：在二级标题前面，注入带有 page-break 的打印占位符，保证 PDF 排版绝对整齐
@@ -58,21 +137,21 @@ function parseMarkdownToPdfHtml(markdown: string): string {
   
   html = html.replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold text-slate-700 mt-6 mb-3">$1</h3>');
 
-  // 7. 解析加粗 **text**
+  // 6. 解析加粗 **text**
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-slate-900 bg-yellow-50 px-0.5 rounded">$1</strong>');
 
-  // 8. 解析列表
+  // 7. 解析列表
   html = html.replace(/^[-\*] (.*?)$/gm, '<li class="my-2 text-slate-600 leading-relaxed text-sm flex items-start gap-2"><span class="text-blue-500 mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-500"></span><span class="flex-1">$1</span></li>');
   html = html.replace(/(<li [\s\S]*?<\/li>)/g, '<ul class="pl-4 my-4">$1</ul>');
   html = html.replace(/<\/ul>\s*<ul class="pl-4 my-4">/g, ''); // 修复多余的闭合标签
 
-  // 9. 解析引用块
+  // 8. 解析引用块
   html = html.replace(/^&gt; (.*?)$/gm, '<blockquote class="my-6 pl-4 border-l-4 border-blue-500 italic text-slate-600 py-1 bg-blue-50/50 rounded-r-lg">$1</blockquote>');
 
-  // 10. 解析段落 (将不符合上面规则的纯文本转为优雅的段落)
+  // 9. 解析段落 (将非控制标记的纯文本转换为优雅的段落)
   html = html.split('\n\n').map(p => {
     const trimmed = p.trim();
-    if (trimmed.startsWith('<h') || trimmed.startsWith('<ul') || trimmed.startsWith('<div') || trimmed.startsWith('<pre') || trimmed.startsWith('<blockquote')) {
+    if (trimmed.startsWith('<h') || trimmed.startsWith('<ul') || trimmed.startsWith('<div') || trimmed.startsWith('<pre') || trimmed.startsWith('<blockquote') || trimmed.startsWith('<li')) {
       return p;
     }
     if (trimmed) {
@@ -125,22 +204,10 @@ export function convertMarkdownToPdfHtml(
       h1, h2, h3 {
         page-break-after: avoid;
       }
-      /* 隐藏打印时的页眉页脚（如果需要浏览器默认自带的除外） */
+      /* 隐藏打印时的页眉页脚 */
       @page {
         margin: 20mm 15mm 20mm 15mm;
       }
-    }
-
-    /* 自定义美化 Before / After 卡片对比样式 */
-    .aeo-before-card {
-      background-color: #fef2f2;
-      border: 1px solid #fee2e2;
-      border-left: 4px solid #ef4444;
-    }
-    .aeo-after-card {
-      background-color: #f0fdf4;
-      border: 1px solid #dcfce7;
-      border-left: 4px solid #22c55e;
     }
   </style>
 </head>
@@ -176,7 +243,7 @@ export function convertMarkdownToPdfHtml(
     </div>
   </section>
 
-  <!-- 主体解析内容 -->
+  <!-- 主体解析内容（包含我们渲染好、圆角卡片质感的 30天路线图表格） -->
   <article class="prose prose-slate max-w-none">
     ${parsedBody}
   </article>

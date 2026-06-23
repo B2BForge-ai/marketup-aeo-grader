@@ -1,8 +1,7 @@
 'use client';
 
-import React, { Suspense, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, FileText, Globe, RefreshCw, Mail, Phone, AlertTriangle, Download, FileCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, XCircle, FileText, Globe, ArrowRight, RefreshCw, Mail, Phone, AlertTriangle, Download, Eye } from 'lucide-react';
 
 interface AuditRequest {
   id: string;
@@ -15,24 +14,8 @@ interface AuditRequest {
   createdAt: string;
 }
 
-export default function AdminReportsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-        </div>
-      }
-    >
-      <AdminReportsContent />
-    </Suspense>
-  );
-}
-
-function AdminReportsContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-
+export default function App() {
+  const [token, setToken] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [list, setList] = useState<AuditRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,52 +23,40 @@ function AdminReportsContent() {
   const [editedReport, setEditedReport] = useState<string>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
-  
-  // 保存生成成功的 PDF 下载/预览地址
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
 
-  // 通过 API 鉴权（token 与 Vercel ADMIN_SECRET_TOKEN 一致即可）
   useEffect(() => {
-    if (!token?.trim()) {
-      setAuthorized(false);
-      return;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+      setToken(urlToken);
     }
-    void (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
-        if (res.status === 401) {
-          setAuthorized(false);
-          return;
-        }
-        const result = await res.json();
-        if (result.success) {
-          setAuthorized(true);
-          setList(result.reports ?? result.data ?? []);
-        } else {
-          setAuthorized(false);
-        }
-      } catch {
-        setAuthorized(false);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  }, []);
+
+  useEffect(() => {
+    if (token === null) return;
+    
+    const expectedToken = 'mymarketuprocks123'; // Matches ADMIN_SECRET_TOKEN
+    if (token === expectedToken) {
+      setAuthorized(true);
+      fetchPendingList();
+    } else {
+      setAuthorized(false);
+    }
   }, [token]);
 
   const fetchPendingList = async () => {
-    if (!token?.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
+      const res = await fetch(`/api/admin/reports?token=${token}`);
       const result = await res.json();
       if (result.success) {
-        setList(result.reports ?? result.data ?? []);
-      } else if (res.status === 401) {
-        setAuthorized(false);
+        setList(result.data || []);
+      } else {
+        console.error(result.error);
       }
     } catch (e) {
-      console.error('获取列表异常:', e);
+      console.error('Failed to load pending queue:', e);
     } finally {
       setLoading(false);
     }
@@ -95,14 +66,12 @@ function AdminReportsContent() {
     setSelectedItem(item);
     setEditedReport(item.rawAiReport || '');
     setAdminNotes('');
-    setGeneratedPdfUrl(null); // 切换线索时重置下载地址
+    setGeneratedPdfUrl(null); // Reset preview url on new item selection
   };
 
-  // 2. 审批操作 API 提交（核准 / 驳回）
   const handleAction = async (action: 'APPROVE' | 'REJECT') => {
     if (!selectedItem) return;
     setActionLoading(true);
-    setGeneratedPdfUrl(null);
     try {
       const res = await fetch(`/api/admin/reports?token=${token}`, {
         method: 'POST',
@@ -118,37 +87,32 @@ function AdminReportsContent() {
       const result = await res.json();
       if (result.success) {
         if (action === 'APPROVE') {
-          // 保存本地生成的 PDF/HTML URL，方便管理员一键预览/下载
-          setGeneratedPdfUrl(result.downloadUrl);
-          alert('🚀 审核成功！本地 PDF 高保真模版已经生成，请点击下方的按钮进行预览和打印！');
-          // 刷新列表（移除已审核项）
-          setList(list.filter(item => item.id !== selectedItem.id));
+          setGeneratedPdfUrl(result.reportUrl); // Save path for high fidelity local download/preview
+          alert('🚀 报告已成功保存在本地！下方已解锁预览与高保真打印通道。');
         } else {
-          alert('❌ 申请已成功驳回。');
+          // Splice off rejected items from sidebar
           setList(list.filter(item => item.id !== selectedItem.id));
           setSelectedItem(null);
+          setEditedReport('');
+          setAdminNotes('');
+          alert('❌ 申请已成功驳回。');
         }
       } else {
         alert('操作失败: ' + result.error);
       }
     } catch (e) {
-      alert('网络发生异常错误');
+      alert('网络请求异常，请检查后端运行状态。');
     } finally {
       setActionLoading(false);
     }
   };
 
-  // 3. 安全哨兵阻断非授权访问 (伪装 404 保护)
   if (authorized === false) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-300 flex flex-col items-center justify-center p-8">
         <AlertTriangle className="w-16 h-16 text-rose-500 mb-4 animate-bounce" />
         <h1 className="text-4xl font-extrabold text-white mb-2">404 - 找不到页面</h1>
-        <p className="text-slate-500 text-center max-w-md">
-          对不起，您访问的页面或资源已失效。请确认 URL 带有正确的{" "}
-          <code className="text-slate-400">?token=ADMIN_SECRET_TOKEN</code>{" "}
-          参数（与 Vercel 环境变量一致）。
-        </p>
+        <p className="text-slate-500">对不起，您访问的页面或资源已失效。请联系系统管理员。</p>
       </div>
     );
   }
@@ -163,11 +127,11 @@ function AdminReportsContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
-      {/* 顶部简易状态导航栏 */}
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+      {}
+      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span className="text-lg font-bold tracking-wider text-slate-100">MarketUP GEO / AEO 人工审核台</span>
+          <span className="text-lg font-bold tracking-wider text-slate-100">MarketUP GEO / AEO 人工审核控制台</span>
         </div>
         <button 
           onClick={fetchPendingList}
@@ -178,11 +142,11 @@ function AdminReportsContent() {
         </button>
       </header>
 
-      {/* 左右结构主面板 */}
+      {}
       <div className="flex-1 flex overflow-hidden">
         
-        {/* 左侧：待审核线索池 (25% 宽度) */}
-        <aside className="w-1/4 bg-slate-900/50 border-r border-slate-800 flex flex-col">
+        {/* Left side queue */}
+        <aside className="w-1/4 bg-slate-900/50 border-r border-slate-800 flex flex-col flex-shrink-0">
           <div className="p-4 bg-slate-900 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
             待审队列 ({list.length})
           </div>
@@ -223,11 +187,11 @@ function AdminReportsContent() {
           </div>
         </aside>
 
-        {/* 右侧：Markdown 预览、微调与本地 PDF 模拟生成操作区 (75% 宽度) */}
+        {}
         <main className="w-3/4 bg-slate-950 flex flex-col overflow-hidden">
           {selectedItem ? (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* 条目摘要条 */}
+              {/* Item Summary Bar */}
               <div className="p-6 bg-slate-900/40 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2">{selectedItem.companyName}</h2>
@@ -243,74 +207,83 @@ function AdminReportsContent() {
                 </div>
               </div>
 
-              {/* 编辑区：左右双向对比 (Markdown vs 渲染) */}
-              <div className="flex-1 flex overflow-hidden">
-                {/* 左边：支持管理员手动微调的 Textarea */}
-                <div className="w-full h-full p-4 flex flex-col border-r border-slate-800">
-                  <div className="text-xs font-semibold text-slate-400 mb-2 uppercase flex items-center">
-                    <FileText className="w-4 h-4 mr-1" /> 编辑 DeepSeek 原始 Markdown 报告
-                  </div>
-                  <textarea
-                    value={editedReport}
-                    onChange={(e) => setEditedReport(e.target.value)}
-                    className="flex-1 w-full bg-slate-900 border border-slate-800 rounded-lg p-4 font-mono text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
-                    placeholder="正在加载 DeepSeek 报告草稿..."
-                  />
+              {}
+              <div className="flex-1 p-4 flex flex-col overflow-hidden">
+                <div className="text-xs font-semibold text-slate-400 mb-2 uppercase flex items-center justify-between">
+                  <span className="flex items-center"><FileText className="w-4 h-4 mr-1" /> 编辑 DeepSeek 原始 Markdown 报告 (可手写微调表格文本)</span>
+                  {generatedPdfUrl && (
+                    <span className="text-emerald-400 font-bold animate-pulse flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> PDF HTML 已成功生成并落地
+                    </span>
+                  )}
                 </div>
+                
+                <textarea
+                  value={editedReport}
+                  onChange={(e) => {
+                    setEditedReport(e.target.value);
+                    if(generatedPdfUrl) setGeneratedPdfUrl(null); // Clear URL on edit modifications to force rebuild
+                  }}
+                  className="flex-1 w-full bg-slate-900 border border-slate-800 rounded-lg p-4 font-mono text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
+                  placeholder="正在加载 DeepSeek 报告草稿..."
+                />
               </div>
 
-              {/* PDF 生成成功后的动态下载卡片 */}
-              {generatedPdfUrl && (
-                <div className="mx-6 mt-4 p-4 bg-blue-950/40 border border-blue-500/30 rounded-xl flex items-center justify-between animate-fade-in-up">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <FileCheck className="w-6 h-6 text-blue-400" />
+              {}
+              <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col gap-4 flex-shrink-0">
+                {/* Visual download and printer instruction sheet */}
+                {generatedPdfUrl && (
+                  <div className="bg-blue-600/10 border border-blue-500/30 p-4 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2.5 bg-blue-500/20 rounded-lg text-blue-400">
+                        <Download className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">高保真 PDF 报告已在本地生成完毕！</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">请点击右侧按钮预览该网页，在浏览器中按下 <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[10px]">Cmd + P</kbd> 并勾选“背景图形”即可另存为美观 PDF。</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-white text-sm">高保真 PDF HTML 报告已在本地生成</h4>
-                      <p className="text-slate-400 text-xs">通过浏览器直接访问，按 Cmd + P 即可打印为完美分页的 PDF 纸质诊断书。</p>
-                    </div>
+                    <a
+                      href={`${generatedPdfUrl}?token=${token}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold flex items-center space-x-1.5 shadow-lg shadow-blue-600/20 active:scale-95 transition"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>预览并打印 PDF</span>
+                    </a>
                   </div>
-                  <a
-                    href={generatedPdfUrl}
-                    target="_blank"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 transition rounded-lg text-xs font-bold text-white flex items-center space-x-1.5 active:scale-95 shadow-lg shadow-blue-600/10"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>📥 立即预览 / 打印 PDF 报告</span>
-                  </a>
-                </div>
-              )}
+                )}
 
-              {/* 底部控制中心 */}
-              <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0">
-                {/* 审核批注输入框 */}
-                <input
-                  type="text"
-                  placeholder="添加审核备注/驳回理由（选填，将记录在数据库中）"
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  className="w-full md:w-1/2 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700"
-                />
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  {/* Notes update textbox */}
+                  <input
+                    type="text"
+                    placeholder="添加审核备注/驳回理由（选填，将记录在数据库中）"
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    className="w-full md:w-1/2 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700"
+                  />
 
-                {/* 动作按钮组合 */}
-                <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
-                  <button
-                    disabled={actionLoading}
-                    onClick={() => handleAction('REJECT')}
-                    className="px-6 py-2.5 bg-rose-950 hover:bg-rose-900 text-rose-300 rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 disabled:opacity-50"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>拒绝并驳回</span>
-                  </button>
-                  <button
-                    disabled={actionLoading}
-                    onClick={() => handleAction('APPROVE')}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>核准并生成 PDF 报告</span>
-                  </button>
+                  {/* Actions buttons package */}
+                  <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
+                    <button
+                      disabled={actionLoading}
+                      onClick={() => handleAction('REJECT')}
+                      className="px-6 py-2.5 bg-rose-950 hover:bg-rose-900 text-rose-300 rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 disabled:opacity-50"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>拒绝并驳回</span>
+                    </button>
+                    <button
+                      disabled={actionLoading}
+                      onClick={() => handleAction('APPROVE')}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{generatedPdfUrl ? '重新核准生成报告' : '核准并生成 PDF 报告'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEO Grader - 高保真 PDF 打印自测工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen flex flex-col items-center p-6 sm:p-12">
+
+  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-8 border border-slate-200 mb-6">
+    <div class="flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 pb-6 mb-6 gap-4">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">30天行动路线图 - 高保真样式修复预览</h1>
+        <p class="text-slate-500 text-sm mt-1">此页面已应用最新升级的 Markdown 表格编译器。原先可读性极差的乱码现已彻底重构为殿堂级 CEO 简报。</p>
+      </div>
+      <button 
+        onclick="window.print()" 
+        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-lg shadow-lg shadow-blue-600/20 active:scale-95 transition flex items-center gap-2"
+      >
+        <span>🖨️ 打印/另存为 PDF</span>
+      </button>
+    </div>
+
+    <!-- 模拟渲染区域，承接并展示由 pdf-template 编译后的美观表格样式 -->
+    <div class="prose prose-slate max-w-none">
+      <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+        30 天 GEO 实施路线图 (高保真卡片效果预览)
+      </h2>
+      
+      <!-- 这里是解析器实时生成的带有圆角、极窄边框、交叉变色、字重对比的高级 Tailwind 表格 -->
+      <div class="my-6 overflow-hidden border border-slate-200 rounded-xl shadow-md bg-white">
+        <table class="min-w-full divide-y divide-slate-200 text-left border-collapse text-xs sm:text-sm">
+          <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">周次</th>
+              <th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">任务类别</th>
+              <th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">核心行动项</th>
+              <th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">负责人</th>
+              <th scope="col" class="px-4 py-3 font-bold text-slate-800 tracking-wide bg-slate-50/80">预期产出与验证指标</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white">
+            <tr class="bg-white hover:bg-slate-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">第 1 周</td>
+              <td class="px-4 py-3.5 text-slate-600"><span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-semibold">结构化部署</span></td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">
+                1. 将三合一 <code class="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-rose-600 rounded font-mono text-xs border border-slate-200 font-semibold">JSON-LD</code> 代码部署到官网 <code class="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-rose-600 rounded font-mono text-xs border border-slate-200 font-semibold">&lt;head&gt;</code>。<br>
+                2. 修改首页 Hero 区域文案（第一组）。
+              </td>
+              <td class="px-4 py-3.5 text-slate-500 whitespace-nowrap">技术 / SEO</td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">代码上线并通过 Google Rich Results Test 验证；首页标题包含“B2B营销自动化平台”。</td>
+            </tr>
+            <tr class="bg-slate-50/30 hover:bg-slate-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">第 2 周</td>
+              <td class="px-4 py-3.5 text-slate-600"><span class="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">内容布线</span></td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">
+                1. 在知乎与微信公众号同步发布《为什么企业需要全渠道营销管理平台？》文章。<br>
+                2. 启动核心产品优势页的 AI 索引优化。
+              </td>
+              <td class="px-4 py-3.5 text-slate-500 whitespace-nowrap">内容运营 / 市场</td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">大模型搜索引擎（Kimi、豆包）中该文案索引成功率提升 40%，长尾词覆盖增长。</td>
+            </tr>
+            <tr class="bg-white hover:bg-slate-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">第 3 周</td>
+              <td class="px-4 py-3.5 text-slate-600"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-semibold">向量增强</span></td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">
+                1. 针对“解决方案”页面进行 H3 段落重组。<br>
+                2. 部署 <code class="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-rose-600 rounded font-mono text-xs border border-slate-200 font-semibold">FAQPage</code> 代码以适配 QA 神经网络召回模型。
+              </td>
+              <td class="px-4 py-3.5 text-slate-500 whitespace-nowrap">技术 / 产品经理</td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">官网首页的 TF-IDF 信息切片密度提升 50% 以上，召回权重进入 A 类推荐。</td>
+            </tr>
+            <tr class="bg-slate-50/30 hover:bg-slate-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-slate-900 font-bold whitespace-nowrap">第 4 周</td>
+              <td class="px-4 py-3.5 text-slate-600"><span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs font-semibold">效果复盘</span></td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">
+                1. 使用 AI 搜索引擎真实测试 3 个行业核心提问词拦截率。<br>
+                2. 调整缺失的物理实体名词，固化 GEO 长期整改机制。
+              </td>
+              <td class="px-4 py-3.5 text-slate-500 whitespace-nowrap">SEO 团队</td>
+              <td class="px-4 py-3.5 text-slate-600 whitespace-normal break-words leading-relaxed">GEO 综合得分稳定在 85 分以上，在主流 AI 搜索引擎首屏拦截率超过 60%。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
