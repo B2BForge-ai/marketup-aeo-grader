@@ -17,8 +17,15 @@ export function isPhoneUsageTestWhitelisted(phone: string): boolean {
   return PHONE_USAGE_TEST_WHITELIST.has(normalizePhoneForLookup(phone));
 }
 
+/** 测试用邮箱，跳过「每邮箱仅可申请一次深度报告 OTP」限制 */
+const EMAIL_USAGE_TEST_WHITELIST = new Set(["milo@bagevent.cn"]);
+
 export function normalizeEmailForLookup(email: string): string {
   return email.trim().toLowerCase();
+}
+
+export function isEmailUsageTestWhitelisted(email: string): boolean {
+  return EMAIL_USAGE_TEST_WHITELIST.has(normalizeEmailForLookup(email));
 }
 
 export async function isPhoneUsedForGrade(phone: string): Promise<boolean> {
@@ -38,6 +45,9 @@ export async function isEmailUsedForDeepReport(
   excludeAuditId?: string
 ): Promise<boolean> {
   const normalized = normalizeEmailForLookup(email);
+  if (isEmailUsageTestWhitelisted(normalized)) {
+    return false;
+  }
   const existing = await prisma.auditRequest.findFirst({
     where: {
       email: normalized,
