@@ -44,27 +44,45 @@ function AdminReportsContent() {
   // 保存生成成功的 PDF 下载/预览地址
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
 
-  // 1. 安全凭证拦截与首屏鉴权
+  // 通过 API 鉴权（token 与 Vercel ADMIN_SECRET_TOKEN 一致即可）
   useEffect(() => {
-    const expectedToken = 'mymarketuprocks123'; // 对应 process.env.ADMIN_SECRET_TOKEN 的值
-    if (token === expectedToken) {
-      setAuthorized(true);
-      fetchPendingList();
-    } else {
+    if (!token?.trim()) {
       setAuthorized(false);
+      return;
     }
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
+        if (res.status === 401) {
+          setAuthorized(false);
+          return;
+        }
+        const result = await res.json();
+        if (result.success) {
+          setAuthorized(true);
+          setList(result.data || []);
+        } else {
+          setAuthorized(false);
+        }
+      } catch {
+        setAuthorized(false);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [token]);
 
-  // 获取待审核列表
   const fetchPendingList = async () => {
+    if (!token?.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?token=${token}`);
+      const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
       const result = await res.json();
       if (result.success) {
         setList(result.data || []);
-      } else {
-        console.error(result.error);
+      } else if (res.status === 401) {
+        setAuthorized(false);
       }
     } catch (e) {
       console.error('获取列表异常:', e);
@@ -126,7 +144,11 @@ function AdminReportsContent() {
       <div className="min-h-screen bg-slate-950 text-slate-300 flex flex-col items-center justify-center p-8">
         <AlertTriangle className="w-16 h-16 text-rose-500 mb-4 animate-bounce" />
         <h1 className="text-4xl font-extrabold text-white mb-2">404 - 找不到页面</h1>
-        <p className="text-slate-500">对不起，您访问的页面或资源已失效。请联系系统管理员。</p>
+        <p className="text-slate-500 text-center max-w-md">
+          对不起，您访问的页面或资源已失效。请确认 URL 带有正确的{" "}
+          <code className="text-slate-400">?token=ADMIN_SECRET_TOKEN</code>{" "}
+          参数（与 Vercel 环境变量一致）。
+        </p>
       </div>
     );
   }
