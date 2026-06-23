@@ -1,390 +1,295 @@
-"use client";
+'use client';
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { CheckCircle, XCircle, FileText, Globe, ArrowRight, RefreshCw, Mail, Phone, AlertTriangle, Download, FileCheck } from 'lucide-react';
 
-interface AuditReportItem {
+interface AuditRequest {
   id: string;
   companyName: string;
   url: string;
   phone: string;
-  email: string | null;
+  email: string;
   initialScore: number;
   rawAiReport: string | null;
-  adminNotes: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function NotFoundPage({ reason }: { reason: "missing" | "invalid" }) {
-  return (
-    <div className="min-h-screen bg-[#F7F7F7] flex items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        <p className="text-6xl font-bold text-[#DDD] mb-4">404</p>
-        <p className="text-[#888] text-lg mb-3">对不起，该页面不存在</p>
-        {reason === "missing" ? (
-          <p className="text-sm text-[#AAA] leading-relaxed">
-            请在 URL 末尾加上管理 Token，例如：
-            <br />
-            <code className="text-[#666]">/admin/reports?token=你的ADMIN_SECRET_TOKEN</code>
-          </p>
-        ) : (
-          <p className="text-sm text-[#AAA] leading-relaxed">
-            访问 Token 无效或未在 Vercel 配置{" "}
-            <code className="text-[#666]">ADMIN_SECRET_TOKEN</code>
-            。请确认环境变量与 URL 中的 token 完全一致后重新部署。
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AdminReportsContent() {
+export default function App() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token")?.trim() ?? "";
+  const token = searchParams.get('token');
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [reports, setReports] = useState<AuditReportItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState("");
-  const [adminNotes, setAdminNotes] = useState("");
+  const [list, setList] = useState<AuditRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<AuditRequest | null>(null);
+  const [editedReport, setEditedReport] = useState<string>('');
   const [actionLoading, setActionLoading] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-  const [reportSuccess, setReportSuccess] = useState<{
-    url: string;
-    companyName: string;
-    email: string;
-    emailMock?: boolean;
-  } | null>(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  
+  // 保存生成成功的 PDF 下载/预览地址
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
 
-  const selected = reports.find((r) => r.id === selectedId) ?? null;
-
-  const fetchReports = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
-      if (res.status === 401) {
-        setAuthorized(false);
-        return;
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "加载失败");
+  // 1. 安全凭证拦截与首屏鉴权
+  useEffect(() => {
+    const expectedToken = 'mymarketuprocks123'; // 对应 process.env.ADMIN_SECRET_TOKEN 的值
+    if (token === expectedToken) {
       setAuthorized(true);
-      setReports(data.reports ?? []);
-    } catch (err) {
-      setToast({
-        type: "error",
-        msg: err instanceof Error ? err.message : "加载失败",
-      });
-    } finally {
-      setLoading(false);
+      fetchPendingList();
+    } else {
+      setAuthorized(false);
     }
   }, [token]);
 
-  useEffect(() => {
-    if (!token) {
-      setAuthorized(false);
-      return;
-    }
-    fetchReports();
-  }, [token, fetchReports]);
-
-  useEffect(() => {
-    if (selected) {
-      setEditedContent(selected.rawAiReport ?? "");
-      setAdminNotes(selected.adminNotes ?? "");
-    } else {
-      setEditedContent("");
-      setAdminNotes("");
-    }
-  }, [selected]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  async function handleAction(action: "APPROVE" | "REJECT") {
-    if (!selectedId || !token) return;
-
-    const confirmMsg =
-      action === "APPROVE"
-        ? "确认核准并将专属报告链接发送至客户企业邮箱？"
-        : "确认驳回该申请？";
-    if (!window.confirm(confirmMsg)) return;
-
-    setActionLoading(true);
+  // 获取待审核列表
+  const fetchPendingList = async () => {
+    setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch(`/api/admin/reports?token=${token}`);
+      const result = await res.json();
+      if (result.success) {
+        setList(result.data || []);
+      } else {
+        console.error(result.error);
+      }
+    } catch (e) {
+      console.error('获取列表异常:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectItem = (item: AuditRequest) => {
+    setSelectedItem(item);
+    setEditedReport(item.rawAiReport || '');
+    setAdminNotes('');
+    setGeneratedPdfUrl(null); // 切换线索时重置下载地址
+  };
+
+  // 2. 审批操作 API 提交（核准 / 驳回）
+  const handleAction = async (action: 'APPROVE' | 'REJECT') => {
+    if (!selectedItem) return;
+    setActionLoading(true);
+    setGeneratedPdfUrl(null);
+    try {
+      const res = await fetch(`/api/admin/reports?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedId,
+          id: selectedItem.id,
           action,
-          editedReport: action === "APPROVE" ? editedContent : undefined,
-          adminNotes: adminNotes.trim() || undefined,
-        }),
+          editedReport: action === 'APPROVE' ? editedReport : undefined,
+          adminNotes: adminNotes
+        })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "操作失败");
 
-      if (action === "APPROVE" && data.reportUrl) {
-        setReportSuccess({
-          url: data.reportUrl,
-          companyName: data.companyName ?? selected?.companyName ?? "报告",
-          email: data.email ?? selected?.email ?? "",
-          emailMock: data.emailMock,
-        });
+      const result = await res.json();
+      if (result.success) {
+        if (action === 'APPROVE') {
+          // 保存本地生成的 PDF/HTML URL，方便管理员一键预览/下载
+          setGeneratedPdfUrl(result.downloadUrl);
+          alert('🚀 审核成功！本地 PDF 高保真模版已经生成，请点击下方的按钮进行预览和打印！');
+          // 刷新列表（移除已审核项）
+          setList(list.filter(item => item.id !== selectedItem.id));
+        } else {
+          alert('❌ 申请已成功驳回。');
+          setList(list.filter(item => item.id !== selectedItem.id));
+          setSelectedItem(null);
+        }
+      } else {
+        alert('操作失败: ' + result.error);
       }
-
-      if (action !== "APPROVE") {
-        setToast({ type: "success", msg: "已驳回该申请" });
-      }
-      setSelectedId(null);
-      await fetchReports();
-    } catch (err) {
-      setToast({
-        type: "error",
-        msg: err instanceof Error ? err.message : "操作失败",
-      });
+    } catch (e) {
+      alert('网络发生异常错误');
     } finally {
       setActionLoading(false);
     }
-  }
+  };
 
-  if (!token) {
-    return <NotFoundPage reason="missing" />;
-  }
-
+  // 3. 安全哨兵阻断非授权访问 (伪装 404 保护)
   if (authorized === false) {
-    return <NotFoundPage reason="invalid" />;
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-300 flex flex-col items-center justify-center p-8">
+        <AlertTriangle className="w-16 h-16 text-rose-500 mb-4 animate-bounce" />
+        <h1 className="text-4xl font-extrabold text-white mb-2">404 - 找不到页面</h1>
+        <p className="text-slate-500">对不起，您访问的页面或资源已失效。请联系系统管理员。</p>
+      </div>
+    );
   }
 
   if (authorized === null) {
     return (
-      <div className="min-h-screen bg-[#F7F7F7] flex items-center justify-center">
-        <p className="text-[#888]">验证访问权限...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F7F7]">
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium ${
-            toast.type === "success"
-              ? "bg-emerald-500 text-white"
-              : "bg-[#E8321A] text-white"
-          }`}
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
+      {/* 顶部简易状态导航栏 */}
+      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="text-lg font-bold tracking-wider text-slate-100">MarketUP GEO / AEO 人工审核台</span>
+        </div>
+        <button 
+          onClick={fetchPendingList}
+          className="p-2 bg-slate-800 hover:bg-slate-700 active:scale-95 transition rounded flex items-center space-x-2 text-sm text-slate-300"
         >
-          {toast.msg}
-        </div>
-      )}
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>刷新队列</span>
+        </button>
+      </header>
 
-      {reportSuccess && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setReportSuccess(null)}
-          />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 text-center animate-[fadeInUp_0.3s_ease-out]">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-3xl">
-              🎉
-            </div>
-            <h3 className="text-xl font-semibold text-[#0f172a] mb-2">
-              {reportSuccess.emailMock
-                ? "报告已保存（模拟模式）"
-                : "报告链接已发送至客户邮箱！"}
-            </h3>
-            <p className="text-sm text-[#64748b] mb-4 leading-relaxed">
-              {reportSuccess.companyName} · {reportSuccess.email || "企业邮箱"}
-            </p>
-            <p className="text-xs text-[#94a3b8] mb-5 break-all bg-[#f8fafc] rounded-lg p-3 text-left">
-              专属链接（仅邮件收件人应持有）：<br />
-              <span className="text-[#2563eb]">{reportSuccess.url}</span>
-            </p>
-            <a
-              href={reportSuccess.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[15px] font-semibold transition mb-3"
-            >
-              🔗 预览客户报告页面
-            </a>
-            <button
-              onClick={() => setReportSuccess(null)}
-              className="w-full py-2.5 text-sm text-[#64748b] hover:text-[#334155] transition"
-            >
-              关闭
-            </button>
+      {/* 左右结构主面板 */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* 左侧：待审核线索池 (25% 宽度) */}
+        <aside className="w-1/4 bg-slate-900/50 border-r border-slate-800 flex flex-col">
+          <div className="p-4 bg-slate-900 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            待审队列 ({list.length})
           </div>
-        </div>
-      )}
-
-      <div className="border-b border-[#E8E8E8] bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-[#111]">
-          MarketUP · 深度报告审核后台
-        </h1>
-        <p className="text-sm text-[#888] mt-1">
-          待审核 {reports.length} 条 · 单次审核目标 30 秒内完成
-        </p>
-      </div>
-
-      <div className="flex h-[calc(100vh-73px)]">
-        {/* 左侧列表 25% */}
-        <div className="w-1/4 min-w-[220px] border-r border-[#E8E8E8] bg-white overflow-y-auto">
-          {loading && reports.length === 0 && (
-            <p className="p-4 text-sm text-[#888]">加载中...</p>
-          )}
-          {!loading && reports.length === 0 && (
-            <p className="p-4 text-sm text-[#888]">暂无待审核记录 🎉</p>
-          )}
-          {reports.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSelectedId(item.id)}
-              className={`w-full text-left px-4 py-3 border-b border-[#F0F0F0] transition ${
-                selectedId === item.id
-                  ? "bg-[#FFF5F4] border-l-[3px] border-l-[#E8321A]"
-                  : "hover:bg-[#FAFAFA] border-l-[3px] border-l-transparent"
-              }`}
-            >
-              <p className="text-sm font-semibold text-[#111] truncate">
-                {item.companyName}
-              </p>
-              <p className="text-xs text-[#888] truncate mt-1">
-                {item.email ?? "无邮箱"}
-              </p>
-              <p className="text-xs text-[#E8321A] mt-1">
-                得分 {item.initialScore}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {/* 右侧编辑区 75% */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {!selected ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center text-[#AAA]">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-sm">请从左侧选择一条待审核记录</p>
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-800">
+            {loading && list.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">拉取数据中...</div>
+            ) : list.length === 0 ? (
+              <div className="p-12 text-center text-slate-500 text-sm flex flex-col items-center">
+                <CheckCircle className="w-8 h-8 text-emerald-500/40 mb-2" />
+                <span>没有待审核的深度报告</span>
               </div>
-            </div>
-          ) : (
-            <div className="max-w-4xl mx-auto space-y-4">
-              <div className="bg-white border border-[#E8E8E8] rounded-lg p-5">
-                <h2 className="text-lg font-semibold text-[#111] mb-3">
-                  {selected.companyName}
-                </h2>
-                <table className="text-sm text-[#555] w-full">
-                  <tbody>
-                    <tr>
-                      <td className="py-1 pr-4 text-[#888] w-24">官网</td>
-                      <td className="py-1">{selected.url}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-4 text-[#888]">初筛得分</td>
-                      <td className="py-1 text-[#E8321A] font-semibold">
-                        {selected.initialScore}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-4 text-[#888]">手机号</td>
-                      <td className="py-1">{selected.phone}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-4 text-[#888]">企业邮箱</td>
-                      <td className="py-1">{selected.email ?? "—"}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-4 text-[#888]">申请时间</td>
-                      <td className="py-1">{formatDate(selected.createdAt)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+            ) : (
+              list.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => handleSelectItem(item)}
+                  className={`p-4 cursor-pointer text-left transition ${
+                    selectedItem?.id === item.id 
+                      ? 'bg-blue-600/10 border-l-4 border-blue-500' 
+                      : 'hover:bg-slate-800/40'
+                  }`}
+                >
+                  <div className="font-semibold text-white mb-1 truncate">{item.companyName}</div>
+                  <div className="text-xs text-slate-400 mb-2 truncate flex items-center">
+                    <Globe className="w-3 h-3 mr-1" /> {item.url}
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="px-2 py-0.5 bg-slate-800 rounded text-slate-300">
+                      初筛 {item.initialScore}分
+                    </span>
+                    <span className="text-slate-500">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+
+        {/* 右侧：Markdown 预览、微调与本地 PDF 模拟生成操作区 (75% 宽度) */}
+        <main className="w-3/4 bg-slate-950 flex flex-col overflow-hidden">
+          {selectedItem ? (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* 条目摘要条 */}
+              <div className="p-6 bg-slate-900/40 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">{selectedItem.companyName}</h2>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-400">
+                    <span className="flex items-center"><Globe className="w-4 h-4 mr-1 text-blue-500" /> {selectedItem.url}</span>
+                    <span className="flex items-center"><Phone className="w-4 h-4 mr-1 text-purple-500" /> {selectedItem.phone}</span>
+                    <span className="flex items-center"><Mail className="w-4 h-4 mr-1 text-emerald-500" /> {selectedItem.email}</span>
+                  </div>
+                </div>
+                <div className="bg-slate-900 px-4 py-2 border border-slate-700 rounded-lg text-center">
+                  <span className="text-xs text-slate-500 block uppercase">初筛得分</span>
+                  <span className="text-2xl font-extrabold text-blue-400">{selectedItem.initialScore}</span>
+                </div>
               </div>
 
-              {!selected.rawAiReport && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-                  ⏳ AI 报告仍在生成中，请稍后刷新。您也可以先手动粘贴内容再核准发送。
+              {/* 编辑区：左右双向对比 (Markdown vs 渲染) */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* 左边：支持管理员手动微调的 Textarea */}
+                <div className="w-full h-full p-4 flex flex-col border-r border-slate-800">
+                  <div className="text-xs font-semibold text-slate-400 mb-2 uppercase flex items-center">
+                    <FileText className="w-4 h-4 mr-1" /> 编辑 DeepSeek 原始 Markdown 报告
+                  </div>
+                  <textarea
+                    value={editedReport}
+                    onChange={(e) => setEditedReport(e.target.value)}
+                    className="flex-1 w-full bg-slate-900 border border-slate-800 rounded-lg p-4 font-mono text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none leading-relaxed"
+                    placeholder="正在加载 DeepSeek 报告草稿..."
+                  />
+                </div>
+              </div>
+
+              {/* PDF 生成成功后的动态下载卡片 */}
+              {generatedPdfUrl && (
+                <div className="mx-6 mt-4 p-4 bg-blue-950/40 border border-blue-500/30 rounded-xl flex items-center justify-between animate-fade-in-up">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <FileCheck className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">高保真 PDF HTML 报告已在本地生成</h4>
+                      <p className="text-slate-400 text-xs">通过浏览器直接访问，按 Cmd + P 即可打印为完美分页的 PDF 纸质诊断书。</p>
+                    </div>
+                  </div>
+                  <a
+                    href={generatedPdfUrl}
+                    target="_blank"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 transition rounded-lg text-xs font-bold text-white flex items-center space-x-1.5 active:scale-95 shadow-lg shadow-blue-600/10"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>📥 立即预览 / 打印 PDF 报告</span>
+                  </a>
                 </div>
               )}
 
-              <textarea
-                value={editedContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                placeholder="DeepSeek 生成的 Markdown 报告将显示在此，可直接编辑..."
-                className="w-full min-h-[420px] p-4 border border-[#E8E8E8] rounded-lg text-sm text-[#333] font-mono leading-relaxed resize-y outline-none focus:border-[#E8321A] bg-white"
-              />
+              {/* 底部控制中心 */}
+              <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0">
+                {/* 审核批注输入框 */}
+                <input
+                  type="text"
+                  placeholder="添加审核备注/驳回理由（选填，将记录在数据库中）"
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  className="w-full md:w-1/2 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700"
+                />
 
-              <input
-                type="text"
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-                placeholder="管理员备注（可选，驳回时会保存）"
-                className="w-full px-3 py-2 border border-[#E8E8E8] rounded-lg text-sm outline-none focus:border-[#E8321A] bg-white"
-              />
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => handleAction("REJECT")}
-                  disabled={actionLoading}
-                  className="px-6 py-2.5 rounded-lg border border-[#E8321A] text-[#E8321A] text-sm font-semibold hover:bg-[#FFF5F4] disabled:opacity-50 transition"
-                >
-                  🔴 拒绝并驳回
-                </button>
-                <button
-                  onClick={() => handleAction("APPROVE")}
-                  disabled={actionLoading || !editedContent.trim()}
-                  className="px-6 py-2.5 rounded-lg bg-[#E8321A] text-white text-sm font-semibold hover:bg-[#C82A14] disabled:opacity-50 transition"
-                >
-                  {actionLoading ? "发送中..." : "🟢 核准并发送报告链接"}
-                </button>
-                <button
-                  onClick={fetchReports}
-                  disabled={loading}
-                  className="ml-auto px-4 py-2.5 rounded-lg border border-[#E8E8E8] text-sm text-[#666] hover:bg-[#FAFAFA] transition"
-                >
-                  刷新列表
-                </button>
+                {/* 动作按钮组合 */}
+                <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleAction('REJECT')}
+                    className="px-6 py-2.5 bg-rose-950 hover:bg-rose-900 text-rose-300 rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>拒绝并驳回</span>
+                  </button>
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleAction('APPROVE')}
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center space-x-2 transition active:scale-95 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>核准并生成 PDF 报告</span>
+                  </button>
+                </div>
               </div>
             </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-slate-500">
+              <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 mb-4 text-slate-600 animate-pulse">
+                <FileText className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-400 mb-2">未选择任何审计目标</h3>
+              <p className="text-sm text-slate-600 max-w-sm">请在左侧待审核队列中选择一个客户，来加载并审计 DeepSeek 生成的深度 AEO/GEO 诊断报告。</p>
+            </div>
           )}
-        </div>
+        </main>
+
       </div>
     </div>
-  );
-}
-
-export default function AdminReportsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#F7F7F7] flex items-center justify-center">
-          <p className="text-[#888]">加载中...</p>
-        </div>
-      }
-    >
-      <AdminReportsContent />
-    </Suspense>
   );
 }
