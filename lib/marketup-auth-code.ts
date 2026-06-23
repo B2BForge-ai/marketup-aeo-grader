@@ -49,6 +49,7 @@ export async function sendMarketupSmsCode(phone: string): Promise<void> {
   parseMarketupResponse(payload);
 }
 
+/** MarketUP 主站若未暴露验码 HTTP 接口，则无法从 aeo-grader 侧校验 Redis 中的验证码 */
 export async function verifyMarketupSmsCode(
   phone: string,
   code: string
@@ -67,10 +68,10 @@ export async function verifyMarketupSmsCode(
     cache: "no-store",
   });
 
-  const payload = (await response.json()) as MarketupApiResponse<boolean>;
-  if (!response.ok || payload.code !== 200) {
+  if (response.status === 404) {
     return false;
   }
 
-  return payload.data === true;
+  const payload = (await response.json()) as MarketupApiResponse<boolean>;
+  return response.ok && payload.code === 200 && payload.data === true;
 }

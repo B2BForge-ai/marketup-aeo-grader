@@ -6,8 +6,15 @@ export const PHONE_USAGE_LIMIT_MESSAGE =
 export const EMAIL_USAGE_LIMIT_MESSAGE =
   "该企业邮箱已申请过深度报告。如需再次获取，请关注 MarketUP 后续活动或通过官方渠道联系我们。";
 
+/** 测试用手机号，跳过「每号仅可初筛一次」限制 */
+const PHONE_USAGE_TEST_WHITELIST = new Set(["13770626459"]);
+
 export function normalizePhoneForLookup(phone: string): string {
   return phone.trim();
+}
+
+export function isPhoneUsageTestWhitelisted(phone: string): boolean {
+  return PHONE_USAGE_TEST_WHITELIST.has(normalizePhoneForLookup(phone));
 }
 
 export function normalizeEmailForLookup(email: string): string {
@@ -16,6 +23,9 @@ export function normalizeEmailForLookup(email: string): string {
 
 export async function isPhoneUsedForGrade(phone: string): Promise<boolean> {
   const normalized = normalizePhoneForLookup(phone);
+  if (isPhoneUsageTestWhitelisted(normalized)) {
+    return false;
+  }
   const existing = await prisma.auditRequest.findFirst({
     where: { phone: normalized },
     select: { id: true },

@@ -15,6 +15,10 @@ import {
 import { computeSemanticSimilarityPercent } from "@/lib/text-similarity";
 import { isPrismaConnectionError } from "@/lib/db-health";
 import { verifyMarketupSmsCode } from "@/lib/marketup-auth-code";
+import {
+  isMarketupSmsSendEnabled,
+  verifyPhoneOtp,
+} from "@/lib/phone-otp-store";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
 
 export const maxDuration = 60;
@@ -191,10 +195,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请输入手机验证码" }, { status: 400 });
     }
 
-    const smsVerified = await verifyMarketupSmsCode(
-      normalizedPhone,
-      smsCode.trim()
-    );
+    let smsVerified = false;
+
+    if (isMarketupSmsSendEnabled()) {
+      smsVerified = await verifyMarketupSmsCode(
+        normalizedPhone,
+        smsCode.trim()
+      );
+      if (!smsVerified) {
+        smsVerified = verifyPhoneOtp(normalizedPhone, smsCode.trim()).ok;
+      }
+    } else {
+      smsVerified = verifyPhoneOtp(normalizedPhone, smsCode.trim()).ok;
+    }
+
     if (!smsVerified) {
       return NextResponse.json(
         { error: "手机验证码不正确或已过期，请重新获取" },
