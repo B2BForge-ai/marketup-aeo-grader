@@ -80,6 +80,9 @@ export default function Home() {
   const [industry, setIndustry] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [phone, setPhone] = useState("");
+  const [smsCode, setSmsCode] = useState("");
+  const [smsCountdown, setSmsCountdown] = useState(0);
+  const [sendingSms, setSendingSms] = useState(false);
   const [auditRequestId, setAuditRequestId] = useState("");
   const [result, setResult] = useState<GradeResult | null>(null);
   const [error, setError] = useState("");
@@ -97,9 +100,39 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [view]);
 
+  useEffect(() => {
+    if (smsCountdown <= 0) return;
+    const timer = setTimeout(() => setSmsCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [smsCountdown]);
+
+  async function handleSendSmsCode() {
+    if (phone.trim().length !== 11) {
+      setError("请先输入有效的 11 位手机号");
+      return;
+    }
+
+    setSendingSms(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/sms-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "验证码发送失败");
+      setSmsCountdown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "验证码发送失败");
+    } finally {
+      setSendingSms(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!companyName.trim() || !industry.trim() || !websiteUrl.trim() || !phone.trim()) return;
+    if (!companyName.trim() || !industry.trim() || !websiteUrl.trim() || !phone.trim() || !smsCode.trim()) return;
 
     setError("");
     setDeepReportVerified(false);
@@ -112,7 +145,13 @@ export default function Home() {
       const res = await fetch("/api/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, industry, websiteUrl, phone }),
+        body: JSON.stringify({
+          companyName,
+          industry,
+          websiteUrl,
+          phone,
+          smsCode: smsCode.trim(),
+        }),
       });
 
       const data = await res.json();
@@ -136,6 +175,8 @@ export default function Home() {
     setShowOtpModal(false);
     setWebsiteUrl("");
     setPhone("");
+    setSmsCode("");
+    setSmsCountdown(0);
     setError("");
   }
 
@@ -229,12 +270,52 @@ export default function Home() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                  onChange={(e) => {
+                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 11));
+                    setError("");
+                  }}
                   placeholder="11 位手机号，用于接收诊断跟进"
                   required
                   maxLength={11}
                   className={inputClass}
                 />
+              </div>
+              <div className="mb-5">
+                <label className="text-sm font-medium text-[#444] mb-2 block">
+                  手机验证码
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={smsCode}
+                    onChange={(e) => {
+                      setSmsCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                      setError("");
+                    }}
+                    placeholder="6 位短信验证码"
+                    required
+                    maxLength={6}
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendSmsCode}
+                    disabled={
+                      sendingSms || smsCountdown > 0 || phone.trim().length !== 11
+                    }
+                    className="shrink-0 px-4 rounded-lg border border-[#E8321A] text-[#E8321A] text-sm font-medium hover:bg-[#FFF5F4] disabled:opacity-40 disabled:cursor-not-allowed transition whitespace-nowrap"
+                  >
+                    {sendingSms
+                      ? "发送中..."
+                      : smsCountdown > 0
+                        ? `${smsCountdown}s`
+                        : "获取验证码"}
+                  </button>
+                </div>
+                <p className="text-xs text-[#999] mt-2">
+                  验证码由 MarketUP 短信服务发送，与官网表单验证逻辑一致。
+                </p>
               </div>
 
               {error && (

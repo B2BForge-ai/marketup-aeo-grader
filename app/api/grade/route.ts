@@ -14,6 +14,7 @@ import {
 } from "@/lib/usage-limit";
 import { computeSemanticSimilarityPercent } from "@/lib/text-similarity";
 import { isPrismaConnectionError } from "@/lib/db-health";
+import { verifyMarketupSmsCode } from "@/lib/marketup-auth-code";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
 
 export const maxDuration = 60;
@@ -170,7 +171,7 @@ async function callDeepSeekChat(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { companyName, industry, websiteUrl, phone } = body;
+    const { companyName, industry, websiteUrl, phone, smsCode } = body;
 
     if (!companyName?.trim() || !industry?.trim() || !websiteUrl?.trim()) {
       return NextResponse.json(
@@ -185,6 +186,21 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedPhone = normalizePhoneForLookup(phone);
+
+    if (!smsCode?.trim()) {
+      return NextResponse.json({ error: "请输入手机验证码" }, { status: 400 });
+    }
+
+    const smsVerified = await verifyMarketupSmsCode(
+      normalizedPhone,
+      smsCode.trim()
+    );
+    if (!smsVerified) {
+      return NextResponse.json(
+        { error: "手机验证码不正确或已过期，请重新获取" },
+        { status: 400 }
+      );
+    }
 
     if (await isPhoneUsedForGrade(normalizedPhone)) {
       return NextResponse.json({ error: PHONE_USAGE_LIMIT_MESSAGE }, { status: 409 });
