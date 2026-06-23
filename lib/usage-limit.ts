@@ -18,7 +18,10 @@ export function isPhoneUsageTestWhitelisted(phone: string): boolean {
 }
 
 /** 测试用邮箱，跳过「每邮箱仅可申请一次深度报告 OTP」限制 */
-const EMAIL_USAGE_TEST_WHITELIST = new Set(["milo@bagevent.cn"]);
+const EMAIL_USAGE_TEST_WHITELIST = new Set([
+  "milo@bagevent.cn",
+  "milo@marketup.cn",
+]);
 
 export function normalizeEmailForLookup(email: string): string {
   return email.trim().toLowerCase();

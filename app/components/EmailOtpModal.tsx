@@ -32,6 +32,7 @@ export default function EmailOtpModal({
   const [otpCode, setOtpCode] = useState("");
   const [emailError, setEmailError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -42,6 +43,7 @@ export default function EmailOtpModal({
     setOtpCode("");
     setEmailError("");
     setSubmitError("");
+    setInfoMessage("");
     setCountdown(0);
   }, [open]);
 
@@ -74,6 +76,7 @@ export default function EmailOtpModal({
 
     setSending(true);
     setSubmitError("");
+    setInfoMessage("");
     try {
       const res = await fetch("/api/auth/email-otp", {
         method: "POST",
@@ -82,6 +85,9 @@ export default function EmailOtpModal({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "发送失败");
+      if (data.mock && data.message) {
+        setInfoMessage(data.message);
+      }
       setCountdown(60);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "发送失败");
@@ -205,6 +211,12 @@ export default function EmailOtpModal({
               </button>
             </div>
           </div>
+
+          {infoMessage && (
+            <p className="text-emerald-700 text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              {infoMessage}
+            </p>
+          )}
 
           {submitError && (
             <p className="text-[#E8321A] text-sm flex items-start gap-1.5">

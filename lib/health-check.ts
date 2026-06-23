@@ -36,6 +36,8 @@ export interface HealthReport {
       region: string;
       mockMode: boolean;
       keyLength: number;
+      apiReachable?: boolean;
+      apiError?: string | null;
     };
     admin: HealthCheckItem & { keyLength: number };
     appUrl: HealthCheckItem & { value: string | null };
@@ -54,6 +56,42 @@ function isProductionEnv(): boolean {
 
 function isLocalhostUrl(url: string): boolean {
   return /localhost|127\.0\.0\.1/i.test(url);
+}
+
+/** 正确的美区 Private API Key 通常为 50 字符左右 */
+const MAILGUN_KEY_EXPECTED_LENGTH = 50;
+
+async function checkMailgunApiAccess(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const apiKey = getMailgunApiKey();
+  if (!apiKey) return { ok: false, error: "未配置" };
+
+  try {
+    const auth = Buffer.from(`api:${apiKey}`).toString("base64");
+    const domain = getMailgunDomain();
+    const response = await fetch(
+      `${getMailgunApiBase()}/v3/domains/${domain}`,
+      {
+        headers: { Authorization: `Basic ${auth}` },
+        cache: "no-store",
+      }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      return {
+        ok: false,
+        error: `API ${response.status}: ${text.slice(0, 120)}`,
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "连接失败",
+    };
+  }
 }
 
 export async function runHealthCheck(): Promise<HealthReport> {
@@ -75,6 +113,14 @@ export async function runHealthCheck(): Promise<HealthReport> {
   const appUrlConfigured = Boolean(appUrl);
 
   const marketupSmsEnabled = isMarketupSmsSendEnabled();
+
+  const mailgunKeyLen = getMailgunApiKey()?.length ?? 0;
+  const mailgunKeyLengthSuspicious =
+    mailgunConfigured &&
+    Math.abs(mailgunKeyLen - MAILGUN_KEY_EXPECTED_LENGTH) > 5;
+  const mailgunApi = mailgunConfigured
+    ? await checkMailgunApiAccess()
+    : { ok: false as const, error: "未配置" };
 
   const hints: string[] = [];
 
@@ -101,6 +147,12 @@ export async function runHealthCheck(): Promise<HealthReport> {
     hints.push(
       "MAILGUN_REGION=eu 但 Key 可能属于美区；删除该变量或改为 us，否则发信会 401"
     );
+  } else if (mailgunKeyLengthSuspicious) {
+    hints.push(
+      `MAILGUN_API_KEY 长度为 ${mailgunKeyLen}，正常约为 ${MAILGUN_KEY_EXPECTED_LENGTH}，请核对是否复制错误或含多余空格`
+    );
+  } else if (!mailgunApi.ok) {
+    hints.push(`Mailgun API 不可用：${mailgunApi.error ?? "未知错误"}`);
   }
 
   // --- admin ---
@@ -147,20 +199,35 @@ export async function runHealthCheck(): Promise<HealthReport> {
       detail: deepseekConfigured ? "已配置" : "未配置",
     },
     mailgun: {
-      ok: mailgunConfigured && mailgunRegion !== "eu",
+      ok:
+        mailgunConfigured &&
+        mailgunRegion !== "eu" &&
+        mailgunApi.ok &&
+        !mailgunKeyLengthSuspicious,
       configured: mailgunConfigured,
       domain: getMailgunDomain(),
       fromEmail: getMailgunFromEmail(),
       apiBase: getMailgunApiBase(),
       region: mailgunRegion,
       mockMode: mailgunMockMode,
-      keyLength: getMailgunApiKey()?.length ?? 0,
-      warning: mailgunConfigured && mailgunRegion === "eu" ? "eu 区域可能与 Key 不匹配" : null,
+      keyLength: mailgunKeyLen,
+      apiReachable: mailgunApi.ok,
+      apiError: mailgunApi.error ?? null,
+      warning:
+        mailgunConfigured && mailgunRegion === "eu"
+          ? "eu 区域可能与 Key 不匹配"
+          : mailgunKeyLengthSuspicious
+            ? `Key 长度异常（${mailgunKeyLen}）`
+            : !mailgunApi.ok && mailgunConfigured
+              ? "Mailgun API 不可达"
+              : null,
       detail: mailgunMockMode
         ? "模拟模式"
-        : mailgunRegion === "eu"
-          ? "已配置但区域可能有误"
-          : "已配置",
+        : !mailgunApi.ok
+          ? "Key 已配置但 API 验证失败"
+          : mailgunRegion === "eu"
+            ? "已配置但区域可能有误"
+            : "已配置且 API 正常",
     },
     admin: {
       ok: adminConfigured,
