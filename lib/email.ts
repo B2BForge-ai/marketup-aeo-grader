@@ -52,15 +52,17 @@ export async function sendEmail(params: {
 
   const domain = getMailgunDomain();
   const endpoint = `${getMailgunApiBase()}/v3/${domain}/messages`;
-  const body = new URLSearchParams({
-    from: getMailgunFromEmail(),
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-  });
+
+  // FormData 正确传递 UTF-8 中文（URLSearchParams 在部分环境下会导致主题/正文乱码）
+  const form = new FormData();
+  form.append("from", getMailgunFromEmail());
+  form.append("to", params.to);
+  form.append("subject", params.subject);
+  form.append("html", params.html);
+  form.append("h:Content-Type", "text/html; charset=utf-8");
 
   if (params.text) {
-    body.set("text", params.text);
+    form.append("text", params.text);
   }
 
   const auth = Buffer.from(`api:${apiKey}`).toString("base64");
@@ -68,9 +70,8 @@ export async function sendEmail(params: {
     method: "POST",
     headers: {
       Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: body.toString(),
+    body: form,
   });
 
   if (!response.ok) {
