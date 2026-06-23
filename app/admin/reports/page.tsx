@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, FileText, Globe, ArrowRight, RefreshCw, Mail, Phone, AlertTriangle, Download, FileCheck } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Globe, RefreshCw, Mail, Phone, AlertTriangle, Download, FileCheck } from 'lucide-react';
 
 interface AuditRequest {
   id: string;
@@ -15,7 +15,21 @@ interface AuditRequest {
   createdAt: string;
 }
 
-export default function App() {
+export default function AdminReportsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+      }
+    >
+      <AdminReportsContent />
+    </Suspense>
+  );
+}
+
+function AdminReportsContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
