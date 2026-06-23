@@ -26,12 +26,16 @@ async function main() {
   // 1. Health
   try {
     const { res, data } = await jsonFetch("/api/health");
+    const c = data.checks ?? {};
     record(
       "健康检查 /api/health",
-      res.ok,
-      `DeepSeek=${data.deepseekKeyConfigured}, DB=${data.databaseConnected}${data.databaseError ? ` (${data.databaseError})` : ""}`,
+      res.ok && data.status !== "unhealthy",
+      `status=${data.status ?? "?"} | DB=${c.database?.ok} DeepSeek=${c.deepseek?.ok} Mailgun=${c.mailgun?.ok}${c.mailgun?.mockMode ? "(mock)" : ""} Admin=${c.admin?.ok} SMS=${c.marketupSms?.enabled}`,
       res.status
     );
+    if (Array.isArray(data.hints) && data.hints.length) {
+      data.hints.forEach((h) => console.log(`   💡 ${h}`));
+    }
   } catch (e) {
     record("健康检查 /api/health", false, e.message);
   }
