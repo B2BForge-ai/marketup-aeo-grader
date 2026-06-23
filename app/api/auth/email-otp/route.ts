@@ -37,11 +37,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isEmailConfigured()) {
-      const cooldown = isTestEmail ? { ok: true as const } : canSendOtp(normalizedEmail);
+      const cooldown = isTestEmail
+        ? { ok: true as const }
+        : await canSendOtp(normalizedEmail);
       if (!cooldown.ok) {
         return NextResponse.json({ error: cooldown.error }, { status: 429 });
       }
-      saveOtp(normalizedEmail, MOCK_OTP_CODE);
+      await saveOtp(normalizedEmail, MOCK_OTP_CODE);
       return NextResponse.json({
         success: true,
         message: "模拟模式：验证码为 123456",
@@ -49,7 +51,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const cooldown = isTestEmail ? { ok: true as const } : canSendOtp(normalizedEmail);
+    const cooldown = isTestEmail
+      ? { ok: true as const }
+      : await canSendOtp(normalizedEmail);
     if (!cooldown.ok) {
       return NextResponse.json({ error: cooldown.error }, { status: 429 });
     }
@@ -58,13 +62,13 @@ export async function POST(request: NextRequest) {
 
     try {
       await sendOtpEmail(normalizedEmail, code);
-      saveOtp(normalizedEmail, code);
+      await saveOtp(normalizedEmail, code);
       return NextResponse.json({ success: true, message: "验证码已发送" });
     } catch (sendError) {
       console.error("Mailgun send failed:", sendError);
 
       if (isTestEmail) {
-        saveOtp(normalizedEmail, MOCK_OTP_CODE);
+        await saveOtp(normalizedEmail, MOCK_OTP_CODE);
         return NextResponse.json({
           success: true,
           message: "测试模式：邮件服务异常，请使用验证码 123456",

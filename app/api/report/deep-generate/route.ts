@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: EMAIL_USAGE_LIMIT_MESSAGE }, { status: 409 });
     }
 
-    const otpResult = verifyOtp(email, otpCode);
+    const otpResult = await verifyOtp(email, otpCode);
     if (!otpResult.ok) {
       return NextResponse.json({ error: otpResult.error }, { status: 400 });
     }

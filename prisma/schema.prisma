@@ -23,3 +23,12 @@ model AuditRequest {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
+
+/** 邮箱 OTP（Vercel 多实例共享，替代内存 Map） */
+model EmailOtp {
+  email          String   @id
+  code           String
+  expiresAt      DateTime
+  verifyAttempts Int      @default(0)
+  lastSentAt     DateTime
+}

@@ -1,9 +1,4 @@
-interface OtpRecord {
-  code: string;
-  expiresAt: number;
-  verifyAttempts: number;
-  lastSentAt: number;
-}
+import { prisma } from "@/lib/prisma";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const SEND_COOLDOWN_MS = 60 * 1000;
@@ -16,18 +11,6 @@ export function isMockOtpCode(code: string): boolean {
   return code.trim() === MOCK_OTP_CODE;
 }
 
-type OtpGlobal = typeof globalThis & {
-  __emailOtpStore?: Map<string, OtpRecord>;
-};
-
-function getStore(): Map<string, OtpRecord> {
-  const g = globalThis as OtpGlobal;
-  if (!g.__emailOtpStore) {
-    g.__emailOtpStore = new Map();
-  }
-  return g.__emailOtpStore;
-}
-
 function normalizeEmailKey(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -36,23 +19,35 @@ export function generateOtpCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export function saveOtp(email: string, code: string): void {
+export async function saveOtp(email: string, code: string): Promise<void> {
   const key = normalizeEmailKey(email);
-  const now = Date.now();
-  getStore().set(key, {
-    code,
-    expiresAt: now + OTP_TTL_MS,
-    verifyAttempts: 0,
-    lastSentAt: now,
+  const now = new Date();
+  await prisma.emailOtp.upsert({
+    where: { email: key },
+    create: {
+      email: key,
+      code,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      verifyAttempts: 0,
+      lastSentAt: now,
+    },
+    update: {
+      code,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      verifyAttempts: 0,
+      lastSentAt: now,
+    },
   });
 }
 
-export function canSendOtp(email: string): { ok: true } | { ok: false; error: string } {
+export async function canSendOtp(
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const key = normalizeEmailKey(email);
-  const existing = getStore().get(key);
+  const existing = await prisma.emailOtp.findUnique({ where: { email: key } });
   if (!existing) return { ok: true };
 
-  const elapsed = Date.now() - existing.lastSentAt;
+  const elapsed = Date.now() - existing.lastSentAt.getTime();
   if (elapsed < SEND_COOLDOWN_MS) {
     const waitSec = Math.ceil((SEND_COOLDOWN_MS - elapsed) / 1000);
     return { ok: false, error: `请 ${waitSec} 秒后再获取验证码` };
@@ -60,37 +55,39 @@ export function canSendOtp(email: string): { ok: true } | { ok: false; error: st
   return { ok: true };
 }
 
-export function verifyOtp(
+export async function verifyOtp(
   email: string,
   code: string
-): { ok: true } | { ok: false; error: string } {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (isMockOtpCode(code)) {
     return { ok: true };
   }
 
   const key = normalizeEmailKey(email);
-  const record = getStore().get(key);
+  const record = await prisma.emailOtp.findUnique({ where: { email: key } });
 
   if (!record) {
     return { ok: false, error: "验证码不存在或已过期，请重新获取" };
   }
 
-  if (Date.now() > record.expiresAt) {
-    getStore().delete(key);
+  if (Date.now() > record.expiresAt.getTime()) {
+    await prisma.emailOtp.delete({ where: { email: key } }).catch(() => {});
     return { ok: false, error: "验证码已过期，请重新获取" };
   }
 
   if (record.verifyAttempts >= MAX_VERIFY_ATTEMPTS) {
-    getStore().delete(key);
+    await prisma.emailOtp.delete({ where: { email: key } }).catch(() => {});
     return { ok: false, error: "验证次数过多，请重新获取验证码" };
   }
 
-  record.verifyAttempts += 1;
-
   if (record.code !== code.trim()) {
+    await prisma.emailOtp.update({
+      where: { email: key },
+      data: { verifyAttempts: record.verifyAttempts + 1 },
+    });
     return { ok: false, error: "验证码错误，请检查后重试" };
   }
 
-  getStore().delete(key);
+  await prisma.emailOtp.delete({ where: { email: key } }).catch(() => {});
   return { ok: true };
 }

@@ -21,6 +21,15 @@ CREATE TABLE IF NOT EXISTS "AuditRequest" (
 CREATE UNIQUE INDEX IF NOT EXISTS "AuditRequest_reportAccessToken_key"
   ON "AuditRequest"("reportAccessToken");
 
+CREATE TABLE IF NOT EXISTS "EmailOtp" (
+  "email" TEXT NOT NULL,
+  "code" TEXT NOT NULL,
+  "expiresAt" TIMESTAMP(3) NOT NULL,
+  "verifyAttempts" INTEGER NOT NULL DEFAULT 0,
+  "lastSentAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "EmailOtp_pkey" PRIMARY KEY ("email")
+);
+
 -- 若表已存在，仅追加新列：
 -- ALTER TABLE "AuditRequest" ADD COLUMN IF NOT EXISTS "richReportHtml" TEXT;
 -- ALTER TABLE "AuditRequest" ADD COLUMN IF NOT EXISTS "reportAccessToken" TEXT;
