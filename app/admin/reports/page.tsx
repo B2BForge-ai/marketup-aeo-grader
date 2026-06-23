@@ -26,12 +26,25 @@ function formatDate(iso: string) {
   });
 }
 
-function NotFoundPage() {
+function NotFoundPage({ reason }: { reason: "missing" | "invalid" }) {
   return (
     <div className="min-h-screen bg-[#F7F7F7] flex items-center justify-center px-4">
-      <div className="text-center">
+      <div className="text-center max-w-md">
         <p className="text-6xl font-bold text-[#DDD] mb-4">404</p>
-        <p className="text-[#888] text-lg">对不起，该页面不存在</p>
+        <p className="text-[#888] text-lg mb-3">对不起，该页面不存在</p>
+        {reason === "missing" ? (
+          <p className="text-sm text-[#AAA] leading-relaxed">
+            请在 URL 末尾加上管理 Token，例如：
+            <br />
+            <code className="text-[#666]">/admin/reports?token=你的ADMIN_SECRET_TOKEN</code>
+          </p>
+        ) : (
+          <p className="text-sm text-[#AAA] leading-relaxed">
+            访问 Token 无效或未在 Vercel 配置{" "}
+            <code className="text-[#666]">ADMIN_SECRET_TOKEN</code>
+            。请确认环境变量与 URL 中的 token 完全一致后重新部署。
+          </p>
+        )}
       </div>
     </div>
   );
@@ -156,8 +169,12 @@ function AdminReportsContent() {
     }
   }
 
-  if (!token || authorized === false) {
-    return <NotFoundPage />;
+  if (!token) {
+    return <NotFoundPage reason="missing" />;
+  }
+
+  if (authorized === false) {
+    return <NotFoundPage reason="invalid" />;
   }
 
   if (authorized === null) {
