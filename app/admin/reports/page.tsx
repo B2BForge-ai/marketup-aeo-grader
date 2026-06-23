@@ -61,7 +61,7 @@ function AdminReportsContent() {
         const result = await res.json();
         if (result.success) {
           setAuthorized(true);
-          setList(result.data || []);
+          setList(result.reports ?? result.data ?? []);
         } else {
           setAuthorized(false);
         }
@@ -80,7 +80,7 @@ function AdminReportsContent() {
       const res = await fetch(`/api/admin/reports?token=${encodeURIComponent(token)}`);
       const result = await res.json();
       if (result.success) {
-        setList(result.data || []);
+        setList(result.reports ?? result.data ?? []);
       } else if (res.status === 401) {
         setAuthorized(false);
       }
