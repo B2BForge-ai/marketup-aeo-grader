@@ -6,7 +6,7 @@ import {
   buildReportViewUrl,
   generateReportAccessToken,
 } from "@/lib/report-access";
-import { isEmailMockMode, sendReportLinkEmail } from "@/lib/resend";
+import { isEmailMockMode, sendReportLinkEmail } from "@/lib/email";
 
 export const maxDuration = 60;
 
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           error:
             emailError instanceof Error
               ? `邮件发送失败：${emailError.message}`
-              : "邮件发送失败，请检查 Resend 配置",
+              : "邮件发送失败，请检查 Mailgun 配置",
         },
         { status: 502 }
       );

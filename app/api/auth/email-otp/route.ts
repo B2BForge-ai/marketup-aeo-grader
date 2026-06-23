@@ -10,7 +10,7 @@ import {
   MOCK_OTP_CODE,
   saveOtp,
 } from "@/lib/otp-store";
-import { getResendApiKey, sendOtpEmail } from "@/lib/resend";
+import { isEmailConfigured, sendOtpEmail } from "@/lib/email";
 
 export const maxDuration = 30;
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: EMAIL_USAGE_LIMIT_MESSAGE }, { status: 409 });
     }
 
-    if (!getResendApiKey()) {
+    if (!isEmailConfigured()) {
       const cooldown = canSendOtp(email);
       if (!cooldown.ok) {
         return NextResponse.json({ error: cooldown.error }, { status: 429 });

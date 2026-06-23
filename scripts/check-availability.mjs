@@ -90,7 +90,7 @@ async function main() {
     record(
       "邮箱 OTP 发送",
       res.ok,
-      data.mock ? "模拟模式（无 RESEND_API_KEY）" : data.message || data.error,
+      data.mock ? "模拟模式（无 MAILGUN_API_KEY）" : data.message || data.error,
       res.status
     );
   } catch (e) {
@@ -198,7 +198,7 @@ async function main() {
   }
 
   console.log("\n--- 环境依赖说明 ---\n");
-  console.log("• RESEND 未配置时：OTP/报告邮件为模拟模式，验证码固定 123456");
+  console.log("• Mailgun 未配置时：OTP/报告邮件为模拟模式，验证码固定 123456");
   console.log("• DATABASE_URL 未连通时：初筛、深度报告、管理端列表均不可用");
   console.log("• ADMIN_SECRET_TOKEN 需与访问 /admin/reports?token= 一致");
 }
