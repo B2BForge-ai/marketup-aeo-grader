@@ -35,25 +35,49 @@ export default function App() {
 
   useEffect(() => {
     if (token === null) return;
-    
-    const expectedToken = 'mymarketuprocks123'; // Matches ADMIN_SECRET_TOKEN
-    if (token === expectedToken) {
-      setAuthorized(true);
-      fetchPendingList();
-    } else {
+
+    if (!token.trim()) {
       setAuthorized(false);
+      return;
     }
+
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/admin/reports?token=${encodeURIComponent(token)}`
+        );
+        if (res.status === 401) {
+          setAuthorized(false);
+          return;
+        }
+        const result = await res.json();
+        if (result.success) {
+          setAuthorized(true);
+          setList(result.data ?? result.reports ?? []);
+        } else {
+          setAuthorized(false);
+        }
+      } catch {
+        setAuthorized(false);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [token]);
 
   const fetchPendingList = async () => {
+    if (!token?.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?token=${token}`);
+      const res = await fetch(
+        `/api/admin/reports?token=${encodeURIComponent(token)}`
+      );
       const result = await res.json();
       if (result.success) {
-        setList(result.data || []);
-      } else {
-        console.error(result.error);
+        setList(result.data ?? result.reports ?? []);
+      } else if (res.status === 401) {
+        setAuthorized(false);
       }
     } catch (e) {
       console.error('Failed to load pending queue:', e);
@@ -112,7 +136,15 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 text-slate-300 flex flex-col items-center justify-center p-8">
         <AlertTriangle className="w-16 h-16 text-rose-500 mb-4 animate-bounce" />
         <h1 className="text-4xl font-extrabold text-white mb-2">404 - 找不到页面</h1>
-        <p className="text-slate-500">对不起，您访问的页面或资源已失效。请联系系统管理员。</p>
+        <p className="text-slate-500 text-center max-w-md">
+          Token 无效或未配置。请使用与 Vercel 环境变量{" "}
+          <code className="text-slate-400">ADMIN_SECRET_TOKEN</code>{" "}
+          一致的链接，例如：
+          <br />
+          <code className="text-slate-400 text-sm mt-2 inline-block">
+            /admin/reports?token=dev-admin-123456
+          </code>
+        </p>
       </div>
     );
   }
