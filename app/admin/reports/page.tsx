@@ -111,8 +111,13 @@ export default function App() {
       const result = await res.json();
       if (result.success) {
         if (action === 'APPROVE') {
-          setGeneratedPdfUrl(result.reportUrl); // Save path for high fidelity local download/preview
-          alert('🚀 报告已成功保存在本地！下方已解锁预览与高保真打印通道。');
+          setGeneratedPdfUrl(result.reportUrl);
+          setList(list.filter(item => item.id !== selectedItem.id));
+          alert(
+            result.emailMock
+              ? '🚀 报告已保存！客户邮箱处于模拟模式，未真实发信。可点击下方预览并打印 PDF。'
+              : '🚀 核准成功！报告链接已发送至客户邮箱，您也可点击下方预览并打印 PDF。'
+          );
         } else {
           // Splice off rejected items from sidebar
           setList(list.filter(item => item.id !== selectedItem.id));
@@ -271,12 +276,12 @@ export default function App() {
                         <Download className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">高保真 PDF 报告已在本地生成完毕！</h4>
-                        <p className="text-xs text-slate-400 mt-0.5">请点击右侧按钮预览该网页，在浏览器中按下 <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[10px]">Cmd + P</kbd> 并勾选“背景图形”即可另存为美观 PDF。</p>
+                        <h4 className="text-sm font-bold text-white">报告已生成，可预览并打印 PDF</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">点击下方按钮打开报告页面，在浏览器中按 <kbd className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[10px]">Ctrl + P</kbd> 并勾选「背景图形」即可另存为 PDF。</p>
                       </div>
                     </div>
                     <a
-                      href={`${generatedPdfUrl}?token=${token}`}
+                      href={generatedPdfUrl ?? '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold flex items-center space-x-1.5 shadow-lg shadow-blue-600/20 active:scale-95 transition"

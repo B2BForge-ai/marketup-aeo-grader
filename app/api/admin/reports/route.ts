@@ -1,143 +1,177 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { convertMarkdownToPdfHtml } from '@/lib/pdf-template'; // 替换为最新的高保真 PDF 模版
-import fs from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { convertMarkdownToPdfHtml } from "@/lib/pdf-template";
+import {
+  buildReportViewUrl,
+  generateReportAccessToken,
+} from "@/lib/report-access";
+import { isEmailMockMode, sendReportLinkEmail } from "@/lib/email";
 
-// 提取验证安全口令的复用函数
+export const maxDuration = 60;
+
 function validateAdminToken(request: Request): boolean {
   const { searchParams } = new URL(request.url);
-  const queryToken = searchParams.get('token');
-  
-  const authHeader = request.headers.get('Authorization');
-  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-  
-  const expectedToken = process.env.ADMIN_SECRET_TOKEN;
-  
+  const queryToken = searchParams.get("token");
+
+  const authHeader = request.headers.get("Authorization");
+  const headerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.substring(7)
+    : null;
+
+  const expectedToken = process.env.ADMIN_SECRET_TOKEN?.trim();
+
   if (!expectedToken) {
-    console.error('[ERROR] ADMIN_SECRET_TOKEN is not configured in environment variables.');
+    console.error("[ERROR] ADMIN_SECRET_TOKEN is not configured.");
     return false;
   }
-  
+
   return queryToken === expectedToken || headerToken === expectedToken;
 }
 
-/**
- * GET 接口
- * 用于审核后台获取所有状态为 "PENDING_REVIEW" 的线索记录
- */
 export async function GET(request: Request) {
   try {
     if (!validateAdminToken(request)) {
-      return NextResponse.json({ error: 'Unauthorized: 凭证无效或缺失' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized: 凭证无效或缺失" },
+        { status: 401 }
+      );
     }
 
-    // 从 SQLite 查询所有待审核的记录
     const pendingRequests = await prisma.auditRequest.findMany({
       where: {
-        status: 'PENDING_REVIEW',
-        hasRequestedDeepReport: true
+        status: "PENDING_REVIEW",
+        hasRequestedDeepReport: true,
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({ success: true, data: pendingRequests });
-  } catch (error: any) {
-    console.error('[GET pending requests error]:', error);
-    return NextResponse.json({ error: '获取审核列表失败: ' + error.message }, { status: 500 });
+  } catch (error) {
+    console.error("[GET pending requests error]:", error);
+    return NextResponse.json({ error: "获取审核列表失败" }, { status: 500 });
   }
 }
 
-/**
- * POST 接口
- * 确认核准并模拟生成本地高保真 PDF-HTML 报告
- */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     if (!validateAdminToken(request)) {
-      return NextResponse.json({ error: 'Unauthorized: 凭证无效或缺失' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized: 凭证无效或缺失" },
+        { status: 401 }
+      );
     }
 
     const { id, action, editedReport, adminNotes } = await request.json();
 
-    if (!id || !action) {
-      return NextResponse.json({ error: 'Missing required parameters: id, action' }, { status: 400 });
+    if (!id?.trim() || !action) {
+      return NextResponse.json(
+        { error: "Missing required parameters: id, action" },
+        { status: 400 }
+      );
     }
 
-    // 1. 查找数据库中对应的线索记录
     const auditRequest = await prisma.auditRequest.findUnique({
-      where: { id }
+      where: { id: id.trim() },
     });
 
     if (!auditRequest) {
-      return NextResponse.json({ error: '未找到对应的诊断记录' }, { status: 404 });
+      return NextResponse.json({ error: "未找到对应的诊断记录" }, { status: 404 });
     }
 
-    if (action === 'REJECT') {
-      // 驳回逻辑
-      await prisma.auditRequest.update({
-        where: { id },
-        data: {
-          status: 'REJECTED',
-          adminNotes: adminNotes || '不合规企业，已拒绝生成报告'
-        }
-      });
-      return NextResponse.json({ success: true, message: '报告申请已成功拒绝' });
-    }
-
-    if (action === 'APPROVE') {
-      // 确认核准并模拟在本地生成 PDF
-      const finalReportMarkdown = editedReport || auditRequest.rawAiReport;
-      
-      if (!finalReportMarkdown) {
-        return NextResponse.json({ error: '没有可以生成的报告文本内容' }, { status: 400 });
-      }
-
-      // 2. 将最终修改过的 Markdown 报告渲染为高保真 PDF 专用的现代 HTML (已内置 30天路线图表格解析)
-      const htmlBody = convertMarkdownToPdfHtml(
-        finalReportMarkdown,
-        auditRequest.companyName,
-        auditRequest.initialScore
+    if (auditRequest.status !== "PENDING_REVIEW") {
+      return NextResponse.json(
+        { error: `当前状态为 ${auditRequest.status}，无法审核` },
+        { status: 409 }
       );
-
-      // 3. 【本地模拟 PDF 部署】：将 HTML 写入本地静态目录 public/reports/ 中
-      const reportsDir = path.join(process.cwd(), 'public', 'reports');
-      
-      // 确保目标文件夹存在
-      if (!fs.existsSync(reportsDir)) {
-        fs.mkdirSync(reportsDir, { recursive: true });
-      }
-
-      // 写入物理静态 HTML 文件 (用户在浏览器直接打印即可获得完美 PDF)
-      const reportFileName = `${id}.html`;
-      const reportFilePath = path.join(reportsDir, reportFileName);
-      fs.writeFileSync(reportFilePath, htmlBody, 'utf8');
-
-      // 4. 更新 SQLite 数据库状态为已发送 (SENT)
-      await prisma.auditRequest.update({
-        where: { id },
-        data: {
-          status: 'SENT',
-          rawAiReport: finalReportMarkdown, // 保存最终管理员微调过的内容
-          adminNotes: adminNotes || '人工审核通过，高保真 PDF HTML 已生成'
-        }
-      });
-
-      // 返回生成好的本地静态报告访问路径
-      const reportUrl = `/reports/${reportFileName}`;
-      return NextResponse.json({ 
-        success: true, 
-        message: '核准成功，高保真 PDF 报告已在本地渲染生成！',
-        reportUrl: reportUrl
-      });
     }
 
-    return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+    if (action === "REJECT") {
+      await prisma.auditRequest.update({
+        where: { id: id.trim() },
+        data: {
+          status: "REJECTED",
+          adminNotes: adminNotes?.trim() || "不合规企业，已拒绝生成报告",
+        },
+      });
+      return NextResponse.json({ success: true, message: "报告申请已成功拒绝" });
+    }
 
-  } catch (error: any) {
-    console.error('[POST admin action error]:', error);
-    return NextResponse.json({ error: '处理审核请求失败: ' + error.message }, { status: 500 });
+    if (action !== "APPROVE") {
+      return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+    }
+
+    const finalReportMarkdown =
+      editedReport?.trim() || auditRequest.rawAiReport?.trim() || "";
+
+    if (!finalReportMarkdown) {
+      return NextResponse.json(
+        { error: "没有可以生成的报告文本内容" },
+        { status: 400 }
+      );
+    }
+
+    if (!auditRequest.email?.trim()) {
+      return NextResponse.json(
+        { error: "该记录缺少企业邮箱，无法发送报告链接" },
+        { status: 400 }
+      );
+    }
+
+    const richReportHtml = convertMarkdownToPdfHtml(
+      finalReportMarkdown,
+      auditRequest.companyName,
+      auditRequest.initialScore
+    );
+
+    const accessToken = generateReportAccessToken();
+    const reportUrl = buildReportViewUrl(accessToken);
+
+    try {
+      await sendReportLinkEmail(
+        auditRequest.email,
+        auditRequest.companyName,
+        reportUrl
+      );
+    } catch (emailError) {
+      console.error(
+        `Report link email failed for audit ${id} (${auditRequest.email}):`,
+        emailError
+      );
+      return NextResponse.json(
+        {
+          error:
+            emailError instanceof Error
+              ? `邮件发送失败：${emailError.message}`
+              : "邮件发送失败，请检查 Mailgun 配置",
+        },
+        { status: 502 }
+      );
+    }
+
+    await prisma.auditRequest.update({
+      where: { id: id.trim() },
+      data: {
+        status: "SENT",
+        rawAiReport: finalReportMarkdown,
+        richReportHtml,
+        reportAccessToken: accessToken,
+        adminNotes: adminNotes?.trim() || "人工审核通过，报告链接已发送",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: isEmailMockMode()
+        ? "报告已保存，模拟模式未发邮件"
+        : "核准成功，报告链接已发送至客户邮箱",
+      reportUrl,
+      emailMock: isEmailMockMode(),
+      auditId: id.trim(),
+      companyName: auditRequest.companyName,
+      email: auditRequest.email,
+    });
+  } catch (error) {
+    console.error("[POST admin action error]:", error);
+    return NextResponse.json({ error: "处理审核请求失败" }, { status: 500 });
   }
 }
