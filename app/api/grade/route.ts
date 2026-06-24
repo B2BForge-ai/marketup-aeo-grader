@@ -20,6 +20,7 @@ import {
   verifyPhoneOtp,
 } from "@/lib/phone-otp-store";
 import { normalizeWebsiteUrl, validateWebsiteUrl } from "@/lib/validate-url";
+import { parseAiJson } from "@/lib/parse-ai-json";
 
 export const maxDuration = 60;
 
@@ -169,7 +170,7 @@ async function callDeepSeekChat(
     throw new Error("AI returned empty content");
   }
 
-  return JSON.parse(content);
+  return parseAiJson<Record<string, unknown>>(content);
 }
 
 export async function POST(request: NextRequest) {
@@ -274,7 +275,9 @@ Description: ${websiteMeta.description || "(未检测到)"}
 Merged Copy: ${websiteText}`
     );
 
-    const keywords: ExtractedKeyword[] = keywordPayload.extractedKeywords;
+    const keywords = keywordPayload.extractedKeywords as
+      | ExtractedKeyword[]
+      | undefined;
     if (!keywords?.length || keywords.length < 3) {
       return NextResponse.json(
         { error: "关键词提取失败，请稍后重试" },
@@ -359,7 +362,7 @@ ${topKeywords.map((k, i) => `${i + 1}. ${k.keyword}`).join("\n")}`
       );
     }
 
-    if (message.includes("JSON")) {
+    if (message.includes("AI JSON 解析失败")) {
       return NextResponse.json(
         { error: "AI 返回格式异常，请稍后重试" },
         { status: 502 }
